@@ -30,53 +30,53 @@ $alpha = [a-zA-Z]
 
 tokens :-
 
-<0> $white+                             ;
+<0> $white+                                     ;
 
-<0>       "(*"                          { nestComment `andBegin` comment }
-<0>       "*)"                          { \_ _ -> alexError "Error: unexpected closing comment" }
-<comment> "(*"                          { nestComment }
-<comment> "*)"                          { unnestComment }
-<comment> .                             ;
-<comment> \n                            ;
+<0>       "(*"                                  { nestComment `andBegin` comment }
+<0>       "*)"                                  { \_ _ -> alexError "Error: unexpected closing comment" }
+<comment> "(*"                                  { nestComment }
+<comment> "*)"                                  { unnestComment }
+<comment> .                                     ;
+<comment> \n                                    ;
 
-<0> let                                 { tok TLet }
-<0> rec                                 { tok TRec }
-<0> in                                  { tok TIn }
-<0> if                                  { tok TIf }
-<0> then                                { tok TThen }
-<0> else                                { tok TElse }
-<0> not                                 { tok TNot }
-<0> true                                { tok (TBool True) }
-<0> false                               { tok (TBool False) }
-<0> ("Array.create" | "Array.make")     { tok TArrayCreate }
+<0> let                                         { tok TLet }
+<0> rec                                         { tok TRec }
+<0> in                                          { tok TIn }
+<0> if                                          { tok TIf }
+<0> then                                        { tok TThen }
+<0> else                                        { tok TElse }
+<0> not                                         { tok TNot }
+<0> true                                        { tok (TBool True) }
+<0> false                                       { tok (TBool False) }
+<0> ("Array.create" | "Array.make")             { tok TArrayCreate }
 
-<0> "+"                                 { tok TPlus }
-<0> "-"                                 { tok TMinus }
-<0> "+."                                { tok TPlusDot }
-<0> "-."                                { tok TMinusDot }
-<0> "*."                                { tok TTimesDot }
-<0> "/."                                { tok TDivideDot }
+<0> "+"                                         { tok TPlus }
+<0> "-"                                         { tok TMinus }
+<0> "+."                                        { tok TPlusDot }
+<0> "-."                                        { tok TMinusDot }
+<0> "*."                                        { tok TTimesDot }
+<0> "/."                                        { tok TDivideDot }
 
-<0> "="                                 { tok TEq }
-<0> "<>"                                { tok TNeq }
-<0> "<"                                 { tok TLt }
-<0> "<="                                { tok TLe }
-<0> ">"                                 { tok TGt }
-<0> ">="                                { tok TGe }
+<0> "="                                         { tok TEq }
+<0> "<>"                                        { tok TNeq }
+<0> "<"                                         { tok TLt }
+<0> "<="                                        { tok TLe }
+<0> ">"                                         { tok TGt }
+<0> ">="                                        { tok TGe }
 
-<0> "("                                 { tok TLPar }
-<0> ")"                                 { tok TRPar }
+<0> "("                                         { tok TLPar }
+<0> ")"                                         { tok TRPar }
 
-<0> ","                                 { tok TComma }
-<0> ";"                                 { tok TSemicolon }
-<0> "."                                 { tok TDot }
+<0> ","                                         { tok TComma }
+<0> ";"                                         { tok TSemicolon }
+<0> "."                                         { tok TDot }
 
-<0> "->"                                { tok TRightArrow }
-<0> "<-"                                { tok TLeftArrow }
+<0> "->"                                        { tok TRightArrow }
+<0> "<-"                                        { tok TLeftArrow }
 
-<0> @id                                 { tokIdent }
-<0> $digit+                             { tokInt }
-<0> $digit+ "." ([eE] [\+\-]? $digit+)? { tokFloat }
+<0> @id                                         { tokIdent }
+<0> $digit+                                     { tokInt }
+<0> $digit+ "." $digit* ([eE] [\+\-]? $digit+)? { tokFloat }
 
 {
 data AlexUserState = AlexUserState {nestLevel :: Int}
