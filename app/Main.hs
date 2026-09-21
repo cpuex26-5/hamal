@@ -1,9 +1,9 @@
 module Main (main) where
 
-import Data.ByteString.Lazy (getContents)
+import Data.ByteString.Lazy.Char8 qualified as BS
 import Frontend.Lexer (SpannedToken (..), Token (..), alexMonadScan, runAlex)
 
-scanMany :: LByteString -> Either String [SpannedToken]
+scanMany :: BS.ByteString -> Either String [SpannedToken]
 scanMany input = runAlex input go
   where
     go = do
@@ -13,4 +13,4 @@ scanMany input = runAlex input go
         else (st :) <$> go
 
 main :: IO ()
-main = print . scanMany =<< getContents
+main = print . scanMany =<< BS.getContents

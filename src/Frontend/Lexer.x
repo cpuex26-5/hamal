@@ -1,6 +1,7 @@
 {
 
 {-# LANGUAGE FieldSelectors #-}
+{-# OPTIONS_GHC -Wno-missing-deriving-strategies -Wno-operator-whitespace -Wno-term-variable-capture #-}
 
 module Frontend.Lexer (
   Alex,
@@ -14,7 +15,9 @@ module Frontend.Lexer (
   Token (..),
 ) where
 
+import Control.Monad (void, when)
 import Data.ByteString.Lazy.Char8 qualified as BS
+import Data.Int (Int64)
 }
 
 %wrapper "monadUserState-bytestring"
@@ -89,7 +92,7 @@ modifyNestLevel f = do
 
 nestComment, unnestComment :: AlexAction SpannedToken
 nestComment input len = do
-  modifyNestLevel (+ 1)
+  void $ modifyNestLevel (+ 1)
   skip input len
 unnestComment input len = do
   level <- modifyNestLevel (subtract 1)
@@ -107,10 +110,10 @@ data Span = Span
   { start :: AlexPosn
   , stop :: AlexPosn
   }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 data Token
-  = TIdent LByteString
+  = TIdent BS.ByteString
   | TInt Integer
   | TBool Bool
   | TLet
@@ -141,13 +144,13 @@ data Token
   | TRightArrow
   | TLeftArrow
   | TEof
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 data SpannedToken = SpannedToken
   { stToken :: Token
   , stSpan :: Span
   }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 mkSpan :: AlexInput -> Int64 -> Span
 mkSpan (start, _, str, _) len = Span {start, stop}

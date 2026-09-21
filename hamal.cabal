@@ -14,13 +14,18 @@ common defaults
     -Wall
     -Wcompat
     -Widentities
-    -Wincomplete-record-updates
-    -Wincomplete-uni-patterns
-    -Wmissing-export-lists
-    -Wmissing-home-modules
-    -Wpartial-fields
     -Wredundant-constraints
+    -Wmissing-export-lists
+    -Wpartial-fields
+    -Werror=missing-deriving-strategies
     -Wunused-packages
+    -Winvalid-haddock
+    -Wredundant-bang-patterns
+    -Woperator-whitespace
+    -Wredundant-strictness-flags
+    -Wterm-variable-capture
+    -Wdefaulted-exception-context
+    -fhide-source-paths
 
   default-extensions:
     BlockArguments
@@ -33,16 +38,8 @@ common defaults
     StrictData
     ViewPatterns
 
-  mixins:
-    base hiding (Prelude),
-    relude,
-    relude (Relude as Prelude),
-
-  build-depends:
-    base,
-    relude,
-
   default-language: GHC2024
+  build-depends: base
 
 library
   import: defaults
@@ -50,7 +47,10 @@ library
   exposed-modules:
     Frontend.Lexer
 
-  build-tool-depends: alex:alex
+  build-tool-depends:
+    alex:alex,
+    happy:happy,
+
   build-depends:
     array,
     bytestring,
@@ -60,7 +60,10 @@ library
 executable hamal
   import: defaults
   main-is: Main.hs
-  build-depends: hamal
+  build-depends:
+    bytestring,
+    hamal,
+
   hs-source-dirs: app
 
 test-suite hamal-test
