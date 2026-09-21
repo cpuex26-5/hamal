@@ -46,6 +46,8 @@ library
   -- cabal-gild: discover src
   exposed-modules:
     Frontend.Lexer
+    Syntax
+    Type
 
   build-tool-depends:
     alex:alex,
