@@ -1,16 +1,10 @@
 module Main (main) where
 
 import Data.ByteString.Lazy.Char8 qualified as BS
-import Frontend.Lexer (SpannedToken (..), Token (..), alexMonadScan, runAlex)
-
-scanMany :: BS.ByteString -> Either String [SpannedToken]
-scanMany input = runAlex input go
-  where
-    go = do
-      st <- alexMonadScan
-      if st.stToken == TEof
-        then pure [st]
-        else (st :) <$> go
+import Frontend.Lexer (runAlex)
+import Frontend.Parser (parse)
 
 main :: IO ()
-main = print . scanMany =<< BS.getContents
+main = do
+  input <- BS.getContents
+  print $ runAlex input parse

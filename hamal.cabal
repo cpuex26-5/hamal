@@ -46,6 +46,7 @@ library
   -- cabal-gild: discover src
   exposed-modules:
     Frontend.Lexer
+    Frontend.Parser
     Syntax
     Type
 
