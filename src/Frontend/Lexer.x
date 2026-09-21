@@ -115,6 +115,7 @@ data Span = Span
 data Token
   = TIdent BS.ByteString
   | TInt Integer
+  | TFloat Float
   | TBool Bool
   | TLet
   | TRec
@@ -176,9 +177,9 @@ tokIdent input@(_, _, str, _) len =
 tokInt :: AlexAction SpannedToken
 tokInt input@(_, _, str, _) len = do
   let digits = BS.take len str
-  int <- case BS.readInteger digits of
-    Just (int, _) -> pure int
-    Nothing -> alexError $ "Error: malformed integer literal " <> BS.unpack digits
+  int <- case BS.readInt digits of
+    Just (int, rest) | BS.null rest -> pure int
+    _ -> alexError $ "Error: malformed or out-of-range integer literal " <> BS.unpack digits
   pure
     SpannedToken
       { stToken = TInt int
