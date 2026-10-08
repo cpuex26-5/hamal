@@ -10,8 +10,6 @@ module Frontend.Lexer (
   alexError,
   runAlex,
   alexMonadScan,
-  Span (..),
-  SpannedToken (..),
   Token (..),
 ) where
 
@@ -19,6 +17,7 @@ import Control.Monad (void, when)
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Data.Int (Int64)
 import Numeric (readFloat)
+import Span
 }
 
 %wrapper "monadUserState-bytestring"
@@ -91,7 +90,7 @@ modifyNestLevel f = do
   alexSetUserState ust {nestLevel = level}
   pure level
 
-nestComment, unnestComment :: AlexAction SpannedToken
+nestComment, unnestComment :: AlexAction (Spanned Token)
 nestComment input len = do
   void $ modifyNestLevel (+ 1)
   skip input len
@@ -100,18 +99,12 @@ unnestComment input len = do
   when (level == 0) $ alexSetStartCode 0
   skip input len
 
-alexEOF :: Alex SpannedToken
+alexEOF :: Alex (Spanned Token)
 alexEOF = do
   startCode <- alexGetStartCode
   when (startCode == comment) $ alexError "Error: unclosed comment"
   (pos, _, _, _) <- alexGetInput
-  pure $ SpannedToken TEof (Span pos pos)
-
-data Span = Span
-  { start :: AlexPosn
-  , stop :: AlexPosn
-  }
-  deriving stock (Eq, Show)
+  pure $ Spanned { value = TEof, span = Span { start = posn pos, stop = posn pos } }
 
 data Token
   = TIdent BS.ByteString
@@ -148,54 +141,46 @@ data Token
   | TEof
   deriving stock (Eq, Show)
 
-data SpannedToken = SpannedToken
-  { stToken :: Token
-  , stSpan :: Span
-  }
-  deriving stock (Eq, Show)
+posn :: AlexPosn -> Posn
+posn (AlexPn offset line column) = Posn {offset, line, column}
 
 mkSpan :: AlexInput -> Int64 -> Span
-mkSpan (start, _, str, _) len = Span {start, stop}
+mkSpan (start, _, str, _) len = Span {start = posn start, stop = posn stop}
   where
     stop = BS.foldl' alexMove start $ BS.take len str
 
-tok :: Token -> AlexAction SpannedToken
-tok stToken input len =
-  pure
-    SpannedToken
-      { stToken
-      , stSpan = mkSpan input len
-      }
+tok :: Token -> AlexAction (Spanned Token)
+tok value input len = pure $ Spanned {value, span = mkSpan input len}
 
-tokIdent :: AlexAction SpannedToken
+tokIdent :: AlexAction (Spanned Token)
 tokIdent input@(_, _, str, _) len =
   pure
-    SpannedToken
-      { stToken = TIdent $ BS.take len str
-      , stSpan = mkSpan input len
+    $ Spanned
+      { value = TIdent $ BS.take len str
+      , span = mkSpan input len
       }
 
-tokInt :: AlexAction SpannedToken
+tokInt :: AlexAction (Spanned Token)
 tokInt input@(_, _, str, _) len = do
   let digits = BS.take len str
   int <- case BS.readInt digits of
     Just (int, rest) | BS.null rest -> pure int
     _ -> alexError $ "Error: malformed or out-of-range integer literal " <> BS.unpack digits
   pure
-    SpannedToken
-      { stToken = TInt int
-      , stSpan = mkSpan input len
-      }
+    $ Spanned
+        { value = TInt int
+        , span = mkSpan input len
+        }
 
-tokFloat :: AlexAction SpannedToken
+tokFloat :: AlexAction (Spanned Token)
 tokFloat input@(_, _, str, _) len = do
   let lexeme = BS.unpack $ BS.take len str
   float <- case readFloat lexeme of
     [(float, rest)] | rest `elem` ["", "."] -> pure float
     _ -> alexError $ "Error: malformed float literal " <> lexeme
-  pure
-    SpannedToken
-      { stToken = TFloat float
-      , stSpan = mkSpan input len
+  pure $
+    Spanned
+      { value = TFloat float
+      , span = mkSpan input len
       }
 }

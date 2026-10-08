@@ -2,48 +2,48 @@
 module Frontend.Parser (parse) where
 
 import Frontend.Lexer
+import Span
 import Syntax
 }
 
 %name parse
-%tokentype { SpannedToken }
+%tokentype { Spanned Token }
 %error { parseError }
 %monad { Alex } { >>= } { pure }
-%lexer { lexer } { SpannedToken TEof _ }
-
+%lexer { lexer } { Spanned { value = TEof } }
 
 %token
-  ident       { SpannedToken (TIdent $$) _ }
-  bool        { SpannedToken (TBool $$) _ }
-  int         { SpannedToken (TInt $$) _ }
-  float       { SpannedToken (TFloat $$) _ }
-  let         { SpannedToken TLet _ }
-  rec         { SpannedToken TRec _ }
-  in          { SpannedToken TIn _ }
-  if          { SpannedToken TIf _ }
-  then        { SpannedToken TThen _ }
-  else        { SpannedToken TElse _ }
-  not         { SpannedToken TNot _ }
-  arraycreate { SpannedToken TArrayCreate _ }
-  '+'         { SpannedToken TPlus _ }
-  '-'         { SpannedToken TMinus _ }
-  '+.'        { SpannedToken TPlusDot _ }
-  '-.'        { SpannedToken TMinusDot _ }
-  '*.'        { SpannedToken TTimesDot _ }
-  '/.'        { SpannedToken TDivideDot _ }
-  '='         { SpannedToken TEq _ }
-  '<>'        { SpannedToken TNeq _ }
-  '<'         { SpannedToken TLt _ }
-  '<='        { SpannedToken TLe _ }
-  '>'         { SpannedToken TGt _ }
-  '>='        { SpannedToken TGe _ }
-  '('         { SpannedToken TLPar _ }
-  ')'         { SpannedToken TRPar _ }
-  ','         { SpannedToken TComma _ }
-  ';'         { SpannedToken TSemicolon _ }
-  '.'         { SpannedToken TDot _ }
-  '->'        { SpannedToken TRightArrow _ }
-  '<-'        { SpannedToken TLeftArrow _ }
+  ident       { Spanned { value = TIdent $$ } }
+  bool        { Spanned { value = TBool $$ } }
+  int         { Spanned { value = TInt $$ } }
+  float       { Spanned { value = TFloat $$ } }
+  let         { Spanned { value = TLet } }
+  rec         { Spanned { value = TRec } }
+  in          { Spanned { value = TIn } }
+  if          { Spanned { value = TIf } }
+  then        { Spanned { value = TThen } }
+  else        { Spanned { value = TElse } }
+  not         { Spanned { value = TNot } }
+  arraycreate { Spanned { value = TArrayCreate } }
+  '+'         { Spanned { value = TPlus } }
+  '-'         { Spanned { value = TMinus } }
+  '+.'        { Spanned { value = TPlusDot } }
+  '-.'        { Spanned { value = TMinusDot } }
+  '*.'        { Spanned { value = TTimesDot } }
+  '/.'        { Spanned { value = TDivideDot } }
+  '='         { Spanned { value = TEq } }
+  '<>'        { Spanned { value = TNeq } }
+  '<'         { Spanned { value = TLt } }
+  '<='        { Spanned { value = TLe } }
+  '>'         { Spanned { value = TGt } }
+  '>='        { Spanned { value = TGe } }
+  '('         { Spanned { value = TLPar } }
+  ')'         { Spanned { value = TRPar } }
+  ','         { Spanned { value = TComma } }
+  ';'         { Spanned { value = TSemicolon } }
+  '.'         { Spanned { value = TDot } }
+  '->'        { Spanned { value = TRightArrow } }
+  '<-'        { Spanned { value = TLeftArrow } }
 %%
 
 simple_expr :: { Expr }
@@ -59,11 +59,11 @@ expr :: { Expr }
   : simple_expr { $1 }
 
 {
-parseError :: SpannedToken -> Alex a
+parseError :: Spanned Token -> Alex a
 parseError _ = do
   (AlexPn _ line column, _, _, _) <- alexGetInput
   alexError $ "Parse error at line " <> show line <> ", column " <> show column
 
-lexer :: (SpannedToken -> Alex a) -> Alex a
+lexer :: (Spanned Token -> Alex a) -> Alex a
 lexer = (=<< alexMonadScan)
 }
