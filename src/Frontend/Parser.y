@@ -50,11 +50,18 @@ import Syntax
 %left '=' '<>' '<' '>' '<=' '>='
 %left '+' '-' '+.' '-.'
 %left '*.' '/.'
+%right prec_unary_minus
+%left prec_app
 
 %%
 
 expr :: { Expr Span }
   : simple_expr { $1 }
+  | not expr %prec prec_app { Expr ($1 <> $2.ann) (Not $2) }
+  | '-' expr %prec prec_unary_minus { case $2.kind of
+                                        Float float -> Expr ($1 <> $2.ann) (Float (-float))
+                                        _           -> Expr ($1 <> $2.ann) (Neg $2) }
+  | '-.' expr %prec prec_unary_minus { Expr ($1 <> $2.ann) (FNeg $2) }
   | expr '+' expr { Expr ($1.ann <> $3.ann) (Add $1 $3) }
   | expr '-' expr { Expr ($1.ann <> $3.ann) (Sub $1 $3) }
   | expr '+.' expr { Expr ($1.ann <> $3.ann) (FAdd $1 $3) }
