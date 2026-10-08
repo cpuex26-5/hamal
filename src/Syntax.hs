@@ -7,7 +7,7 @@ data Name = Name BS.ByteString
   deriving stock (Eq, Show)
 
 data Expr a = Expr {ann :: a, kind :: ExprKind a}
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Show, Functor, Foldable, Traversable)
 
 data ExprKind a
   = Unit
@@ -27,7 +27,7 @@ data ExprKind a
   | Le (Expr a) (Expr a)
   | If (Expr a) (Expr a) (Expr a)
   | Let (Name, Type) (Expr a) (Expr a)
-  | Var (Name)
+  | Var Name
   | LetRec (FunBind a) (Expr a)
   | App (Expr a) [(Expr a)]
   | Tuple [(Expr a)]
@@ -35,11 +35,11 @@ data ExprKind a
   | Array (Expr a) (Expr a)
   | Get (Expr a) (Expr a)
   | Put (Expr a) (Expr a) (Expr a)
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Show, Functor, Foldable, Traversable)
 
 data FunBind a = FunBind
   { name :: (Name, Type)
   , args :: [(Name, Type)]
-  , body :: (Expr a)
+  , body :: Expr a
   }
-  deriving stock (Eq, Show)
+  deriving stock (Eq, Show, Functor, Foldable, Traversable)

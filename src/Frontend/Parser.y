@@ -46,7 +46,27 @@ import Syntax
   '.'         { (symbol TDot -> Just $$) }
   '->'        { (symbol TRightArrow -> Just $$) }
   '<-'        { (symbol TLeftArrow -> Just $$) }
+
+%left '=' '<>' '<' '>' '<=' '>='
+%left '+' '-' '+.' '-.'
+%left '*.' '/.'
+
 %%
+
+expr :: { Expr Span }
+  : simple_expr { $1 }
+  | expr '+' expr { Expr ($1.ann <> $3.ann) (Add $1 $3) }
+  | expr '-' expr { Expr ($1.ann <> $3.ann) (Sub $1 $3) }
+  | expr '+.' expr { Expr ($1.ann <> $3.ann) (FAdd $1 $3) }
+  | expr '-.' expr { Expr ($1.ann <> $3.ann) (FSub $1 $3) }
+  | expr '*.' expr { Expr ($1.ann <> $3.ann) (FMul $1 $3) }
+  | expr '/.' expr { Expr ($1.ann <> $3.ann) (FDiv $1 $3) }
+  | expr '=' expr { Expr ($1.ann <> $3.ann) (Eq $1 $3) }
+  | expr '<>' expr { Expr ($1.ann <> $3.ann) $ Not (Expr ($1.ann <> $3.ann) (Eq $1 $3)) }
+  | expr '<' expr { Expr ($1.ann <> $3.ann) $ Not (Expr ($1.ann <> $3.ann) (Le $3 $1)) }
+  | expr '>' expr { Expr ($1.ann <> $3.ann) $ Not (Expr ($1.ann <> $3.ann) (Le $1 $3)) }
+  | expr '<=' expr { Expr ($1.ann <> $3.ann) (Le $1 $3) }
+  | expr '>=' expr { Expr ($1.ann <> $3.ann) (Le $3 $1) }
 
 simple_expr :: { Expr Span }
   : '(' expr ')'  { $2 { ann = $1 <> $3 } }
@@ -56,9 +76,6 @@ simple_expr :: { Expr Span }
   | float  { Expr $1.span (Float $1.value) }
   | ident  { Expr $1.span (Var (Name $1.value)) }
   | simple_expr '.' '(' expr ')'  { Expr ($1.ann <> $5) (Get $1 $4) }
-
-expr :: { Expr Span }
-  : simple_expr { $1 }
 
 {
 parseError :: Spanned Token -> Alex a
