@@ -10,14 +10,14 @@ module Frontend.Lexer (
   alexError,
   runAlex,
   alexMonadScan,
-  Token (..),
 ) where
 
 import Control.Monad (void, when)
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Data.Int (Int64)
+import Frontend.Token (Token (..))
 import Numeric (readFloat)
-import Span
+import Span (Posn(..), Span(..), Spanned(..))
 }
 
 %wrapper "monadUserState-bytestring"
@@ -105,41 +105,6 @@ alexEOF = do
   when (startCode == comment) $ alexError "Error: unclosed comment"
   (pos, _, _, _) <- alexGetInput
   pure $ Spanned { value = TEof, span = Span { start = posn pos, stop = posn pos } }
-
-data Token
-  = TIdent BS.ByteString
-  | TInt Int
-  | TFloat Float
-  | TBool Bool
-  | TLet
-  | TRec
-  | TIn
-  | TIf
-  | TThen
-  | TElse
-  | TNot
-  | TArrayCreate
-  | TPlus
-  | TMinus
-  | TPlusDot
-  | TMinusDot
-  | TTimesDot
-  | TDivideDot
-  | TEq
-  | TNeq
-  | TLt
-  | TLe
-  | TGt
-  | TGe
-  | TLPar
-  | TRPar
-  | TComma
-  | TSemicolon
-  | TDot
-  | TRightArrow
-  | TLeftArrow
-  | TEof
-  deriving stock (Eq, Show)
 
 posn :: AlexPosn -> Posn
 posn (AlexPn offset line column) = Posn {offset, line, column}

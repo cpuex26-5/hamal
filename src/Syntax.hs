@@ -1,42 +1,45 @@
-module Syntax (Name (..), Expr (..), FunBind (..)) where
+module Syntax (Name (..), Expr (..), ExprKind (..), FunBind (..)) where
 
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Type (Type)
 
-newtype Name = Name BS.ByteString
-  deriving newtype (Eq, Show)
+data Name = Name BS.ByteString
+  deriving stock (Eq, Show)
 
-data Expr
+data Expr a = Expr {ann :: a, kind :: ExprKind a}
+  deriving stock (Eq, Show)
+
+data ExprKind a
   = Unit
   | Bool Bool
   | Int Int
   | Float Float
-  | Not Expr
-  | Neg Expr
-  | Add Expr Expr
-  | Sub Expr Expr
-  | FNeg Expr
-  | FAdd Expr Expr
-  | FSub Expr Expr
-  | FMul Expr Expr
-  | FDiv Expr Expr
-  | Eq Expr Expr
-  | Le Expr Expr
-  | If Expr Expr Expr
-  | Let (Name, Type) Expr Expr
-  | Var Name
-  | LetRec FunBind Expr
-  | App Expr [Expr]
-  | Tuple [Expr]
-  | LetTuple [(Name, Type)] Expr Expr
-  | Array Expr Expr
-  | Get Expr Expr
-  | Put Expr Expr Expr
+  | Not (Expr a)
+  | Neg (Expr a)
+  | Add (Expr a) (Expr a)
+  | Sub (Expr a) (Expr a)
+  | FNeg (Expr a)
+  | FAdd (Expr a) (Expr a)
+  | FSub (Expr a) (Expr a)
+  | FMul (Expr a) (Expr a)
+  | FDiv (Expr a) (Expr a)
+  | Eq (Expr a) (Expr a)
+  | Le (Expr a) (Expr a)
+  | If (Expr a) (Expr a) (Expr a)
+  | Let (Name, Type) (Expr a) (Expr a)
+  | Var (Name)
+  | LetRec (FunBind a) (Expr a)
+  | App (Expr a) [(Expr a)]
+  | Tuple [(Expr a)]
+  | LetTuple [(Name, Type)] (Expr a) (Expr a)
+  | Array (Expr a) (Expr a)
+  | Get (Expr a) (Expr a)
+  | Put (Expr a) (Expr a) (Expr a)
   deriving stock (Eq, Show)
 
-data FunBind = FunBind
+data FunBind a = FunBind
   { name :: (Name, Type)
   , args :: [(Name, Type)]
-  , body :: Expr
+  , body :: (Expr a)
   }
   deriving stock (Eq, Show)

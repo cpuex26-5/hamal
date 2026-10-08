@@ -47,6 +47,7 @@ library
   exposed-modules:
     Frontend.Lexer
     Frontend.Parser
+    Frontend.Token
     Span
     Syntax
     Type
