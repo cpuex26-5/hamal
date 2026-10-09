@@ -81,7 +81,7 @@ simple_expr :: { Expr Span }
   | bool  { Expr $1.span (Bool $1.value) }
   | int  { Expr $1.span (Int $1.value) }
   | float  { Expr $1.span (Float $1.value) }
-  | ident  { Expr $1.span (Var (Name $1.value)) }
+  | ident  { Expr $1.span (Var (Name $1.span $1.value)) }
   | simple_expr '.' '(' expr ')'  { Expr ($1.ann <> $5) (Get $1 $4) }
 
 {

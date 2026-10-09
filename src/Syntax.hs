@@ -1,10 +1,9 @@
 module Syntax (Name (..), Expr (..), ExprKind (..), FunBind (..)) where
 
 import Data.ByteString.Lazy.Char8 qualified as BS
-import Type (Type)
 
-data Name = Name BS.ByteString
-  deriving stock (Eq, Show)
+data Name a = Name a BS.ByteString
+  deriving stock (Eq, Show, Functor, Foldable, Traversable)
 
 data Expr a = Expr {ann :: a, kind :: ExprKind a}
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
@@ -26,20 +25,20 @@ data ExprKind a
   | Eq (Expr a) (Expr a)
   | Le (Expr a) (Expr a)
   | If (Expr a) (Expr a) (Expr a)
-  | Let (Name, Type) (Expr a) (Expr a)
-  | Var Name
+  | Let (Name a) (Expr a) (Expr a)
+  | Var (Name a)
   | LetRec (FunBind a) (Expr a)
   | App (Expr a) [(Expr a)]
   | Tuple [(Expr a)]
-  | LetTuple [(Name, Type)] (Expr a) (Expr a)
+  | LetTuple [Name a] (Expr a) (Expr a)
   | Array (Expr a) (Expr a)
   | Get (Expr a) (Expr a)
   | Put (Expr a) (Expr a) (Expr a)
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
 
 data FunBind a = FunBind
-  { name :: (Name, Type)
-  , args :: [(Name, Type)]
+  { name :: Name a
+  , args :: [Name a]
   , body :: Expr a
   }
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
