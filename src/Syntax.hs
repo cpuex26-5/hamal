@@ -8,6 +8,8 @@ data Name a = Name {ann :: a, name :: BS.ByteString}
 data Expr a = Expr {ann :: a, kind :: ExprKind a}
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
 
+-- TODO: maybe better to use 'NonEmpty'
+
 data ExprKind a
   = Unit
   | Bool Bool

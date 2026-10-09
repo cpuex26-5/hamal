@@ -90,7 +90,7 @@ expr :: { Expr Span }
   | elems %prec prec_tuple { Expr (foldMap1 (.ann) $1) $ Tuple (toList $1) }
   | let '(' pattern ')' '=' expr in expr { Expr ($1 <> $8.ann) $ LetTuple $3 $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { Expr ($1.ann <> $7.ann) $ Put $1 $4 $7 }
-  | expr ';' expr { Expr ($1.ann <> $3.ann) $ Let (Name $1.ann "_") $1 $3 }
+  | expr ';' expr { Expr ($1.ann <> $3.ann) $ Let (Name $1.ann "_") $1 $3 } {- interim: $1.ann -}
   | arraycreate simple_expr simple_expr %prec prec_app { Expr ($1 <> $3.ann) $ Array $2 $3 }
 
 
