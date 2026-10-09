@@ -70,7 +70,6 @@ tokens :-
 <0> ";"                                         { tok TSemicolon }
 <0> "."                                         { tok TDot }
 
-<0> "->"                                        { tok TRightArrow }
 <0> "<-"                                        { tok TLeftArrow }
 
 <0> @id                                         { tokIdent }

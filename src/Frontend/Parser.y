@@ -46,7 +46,6 @@ import Syntax
   ','         { (symbol TComma -> Just $$) }
   ';'         { (symbol TSemicolon -> Just $$) }
   '.'         { (symbol TDot -> Just $$) }
-  '->'        { (symbol TRightArrow -> Just $$) }
   '<-'        { (symbol TLeftArrow -> Just $$) }
 
 %nonassoc in

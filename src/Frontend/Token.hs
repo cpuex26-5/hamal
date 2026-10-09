@@ -35,7 +35,6 @@ data Token
   | TComma
   | TSemicolon
   | TDot
-  | TRightArrow
   | TLeftArrow
   | TEof
   deriving stock (Eq, Show)
