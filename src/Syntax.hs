@@ -3,10 +3,16 @@ module Syntax (Name (..), Expr (..), ExprKind (..), FunBind (..)) where
 import Data.ByteString.Lazy.Char8 qualified as BS
 
 data Name a = Name {ann :: a, name :: BS.ByteString}
-  deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Functor, Foldable, Traversable)
+
+instance Show (Name a) where
+  show Name {name} = BS.unpack name
 
 data Expr a = Expr {ann :: a, kind :: ExprKind a}
-  deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Functor, Foldable, Traversable)
+
+instance Show (Expr a) where
+  show Expr {kind} = "(" <> show kind <> ")"
 
 -- TODO: maybe better to use 'NonEmpty'
 
