@@ -15,9 +15,9 @@ module Frontend.Lexer (
 import Control.Monad (void, when)
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Data.Int (Int64)
+import Frontend.Span (Posn(..), Span(..), Spanned(..))
 import Frontend.Token (Token (..))
 import Numeric (readFloat)
-import Span (Posn(..), Span(..), Spanned(..))
 }
 
 %wrapper "monadUserState-bytestring"

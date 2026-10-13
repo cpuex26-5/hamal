@@ -47,10 +47,9 @@ library
   exposed-modules:
     Frontend.Lexer
     Frontend.Parser
+    Frontend.Span
+    Frontend.Syntax
     Frontend.Token
-    Span
-    Syntax
-    Type
 
   build-tool-depends:
     alex:alex,

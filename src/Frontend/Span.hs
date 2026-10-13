@@ -1,4 +1,4 @@
-module Span (Posn (..), Span (..), Spanned (..)) where
+module Frontend.Span (Posn (..), Span (..), Spanned (..)) where
 
 data Posn = Posn {offset, line, column :: Int}
   deriving stock (Eq, Show)
