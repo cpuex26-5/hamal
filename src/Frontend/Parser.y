@@ -5,8 +5,8 @@ import Data.Foldable1
 import Data.List.NonEmpty
 import Frontend.Lexer
 import Frontend.Token
-import Span
-import Syntax
+import Frontend.Syntax
+import Frontend.Span
 }
 
 %name parse
@@ -64,47 +64,47 @@ import Syntax
 
 %%
 
-expr :: { Expr Span }
+expr :: { Syntax Span }
   : simple_expr { $1 }
-  | not expr %prec prec_app { Expr ($1 <> $2.ann) (Not $2) }
+  | not expr %prec prec_app { Syntax ($1 <> $2.ann) (Not $2) }
   | '-' expr %prec prec_unary_minus { case $2.kind of
-                                        Float float -> Expr ($1 <> $2.ann) (Float (-float))
-                                        _           -> Expr ($1 <> $2.ann) (Neg $2) }
-  | '-.' expr %prec prec_unary_minus { Expr ($1 <> $2.ann) (FNeg $2) }
-  | expr '+' expr { Expr ($1.ann <> $3.ann) (Add $1 $3) }
-  | expr '-' expr { Expr ($1.ann <> $3.ann) (Sub $1 $3) }
-  | expr '+.' expr { Expr ($1.ann <> $3.ann) (FAdd $1 $3) }
-  | expr '-.' expr { Expr ($1.ann <> $3.ann) (FSub $1 $3) }
-  | expr '*.' expr { Expr ($1.ann <> $3.ann) (FMul $1 $3) }
-  | expr '/.' expr { Expr ($1.ann <> $3.ann) (FDiv $1 $3) }
-  | expr '=' expr { Expr ($1.ann <> $3.ann) (Eq $1 $3) }
-  | expr '<>' expr { Expr ($1.ann <> $3.ann) $ Not (Expr ($1.ann <> $3.ann) (Eq $1 $3)) }
-  | expr '<' expr { Expr ($1.ann <> $3.ann) $ Not (Expr ($1.ann <> $3.ann) (Le $3 $1)) }
-  | expr '>' expr { Expr ($1.ann <> $3.ann) $ Not (Expr ($1.ann <> $3.ann) (Le $1 $3)) }
-  | expr '<=' expr { Expr ($1.ann <> $3.ann) (Le $1 $3) }
-  | expr '>=' expr { Expr ($1.ann <> $3.ann) (Le $3 $1) }
-  | if expr then expr else expr %prec prec_if { Expr ($1 <> $6.ann) $ If $2 $4 $6 }
-  | let name '=' expr in expr %prec prec_let { Expr ($1 <> $6.ann) $ Let $2 $4 $6 }
-  | let rec funbind in expr %prec prec_let { Expr ($1 <> $5.ann) $ LetRec $3 $5 }
-  | simple_expr parameters %prec prec_app { Expr (foldMap1 (.ann) ($1 :| $2)) $ App $1 $2 }
-  | elems %prec prec_tuple { Expr (foldMap1 (.ann) $1) $ Tuple (toList $1) }
-  | let '(' pattern ')' '=' expr in expr { Expr ($1 <> $8.ann) $ LetTuple $3 $6 $8 }
-  | simple_expr '.' '(' expr ')' '<-' expr { Expr ($1.ann <> $7.ann) $ Put $1 $4 $7 }
-  | expr ';' expr { Expr ($1.ann <> $3.ann) $ Let (Name $1.ann "_") $1 $3 } {- interim: $1.ann -}
-  | arraycreate simple_expr simple_expr %prec prec_app { Expr ($1 <> $3.ann) $ Array $2 $3 }
+                                        Float float -> Syntax ($1 <> $2.ann) (Float (-float))
+                                        _           -> Syntax ($1 <> $2.ann) (Neg $2) }
+  | '-.' expr %prec prec_unary_minus { Syntax ($1 <> $2.ann) (FNeg $2) }
+  | expr '+' expr { Syntax ($1.ann <> $3.ann) (Add $1 $3) }
+  | expr '-' expr { Syntax ($1.ann <> $3.ann) (Sub $1 $3) }
+  | expr '+.' expr { Syntax ($1.ann <> $3.ann) (FAdd $1 $3) }
+  | expr '-.' expr { Syntax ($1.ann <> $3.ann) (FSub $1 $3) }
+  | expr '*.' expr { Syntax ($1.ann <> $3.ann) (FMul $1 $3) }
+  | expr '/.' expr { Syntax ($1.ann <> $3.ann) (FDiv $1 $3) }
+  | expr '=' expr { Syntax ($1.ann <> $3.ann) (Eq $1 $3) }
+  | expr '<>' expr { Syntax ($1.ann <> $3.ann) $ Not (Syntax ($1.ann <> $3.ann) (Eq $1 $3)) }
+  | expr '<' expr { Syntax ($1.ann <> $3.ann) $ Not (Syntax ($1.ann <> $3.ann) (Le $3 $1)) }
+  | expr '>' expr { Syntax ($1.ann <> $3.ann) $ Not (Syntax ($1.ann <> $3.ann) (Le $1 $3)) }
+  | expr '<=' expr { Syntax ($1.ann <> $3.ann) (Le $1 $3) }
+  | expr '>=' expr { Syntax ($1.ann <> $3.ann) (Le $3 $1) }
+  | if expr then expr else expr %prec prec_if { Syntax ($1 <> $6.ann) $ If $2 $4 $6 }
+  | let name '=' expr in expr %prec prec_let { Syntax ($1 <> $6.ann) $ Let $2 $4 $6 }
+  | let rec funbind in expr %prec prec_let { Syntax ($1 <> $5.ann) $ LetRec $3 $5 }
+  | simple_expr parameters %prec prec_app { Syntax (foldMap1 (.ann) ($1 :| $2)) $ App $1 $2 }
+  | elems %prec prec_tuple { Syntax (foldMap1 (.ann) $1) $ Tuple (toList $1) }
+  | let '(' pattern ')' '=' expr in expr { Syntax ($1 <> $8.ann) $ LetTuple $3 $6 $8 }
+  | simple_expr '.' '(' expr ')' '<-' expr { Syntax ($1.ann <> $7.ann) $ Put $1 $4 $7 }
+  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (Name $1.ann "_") $1 $3 } {- interim: $1.ann -}
+  | arraycreate simple_expr simple_expr %prec prec_app { Syntax ($1 <> $3.ann) $ Array $2 $3 }
 
 
 name :: { Name Span }
   : ident { Name $1.span $1.value }
 
-simple_expr :: { Expr Span }
+simple_expr :: { Syntax Span }
   : '(' expr ')'  { $2 { ann = $1 <> $3 } }
-  | '(' ')'  { Expr ($1 <> $2) Unit }
-  | bool  { Expr $1.span (Bool $1.value) }
-  | int  { Expr $1.span (Int $1.value) }
-  | float  { Expr $1.span (Float $1.value) }
-  | name  { Expr $1.ann (Var $1) }
-  | simple_expr '.' '(' expr ')'  { Expr ($1.ann <> $5) (Get $1 $4) }
+  | '(' ')'  { Syntax ($1 <> $2) Unit }
+  | bool  { Syntax $1.span (Bool $1.value) }
+  | int  { Syntax $1.span (Int $1.value) }
+  | float  { Syntax $1.span (Float $1.value) }
+  | name  { Syntax $1.ann (Var $1) }
+  | simple_expr '.' '(' expr ')'  { Syntax ($1.ann <> $5) (Get $1 $4) }
 
 funbind :: { FunBind Span }
   : name arguments '=' expr { FunBind $1 $2 $4 }
@@ -113,11 +113,11 @@ arguments :: { [Name Span] }
   : name arguments { $1 : $2 }
   | name { [$1] }
 
-parameters :: { [Expr Span] }
+parameters :: { [Syntax Span] }
   : parameters simple_expr %prec prec_app { $1 <> [$2] }
   | simple_expr %prec prec_app { [$1] }
 
-elems :: { NonEmpty (Expr Span) }
+elems :: { NonEmpty (Syntax Span) }
   : elems ',' expr { $1 <> pure $3 }
   | expr ',' expr { $1 :| pure $3 }
 

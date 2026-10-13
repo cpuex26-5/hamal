@@ -2,7 +2,7 @@ module Frontend.Token (Token (..), symbol, literal, identOf, intOf, floatOf, boo
 
 import Control.Monad (guard)
 import Data.ByteString.Lazy.Char8 qualified as BS
-import Span (Span, Spanned (..))
+import Frontend.Span (Span, Spanned (..))
 import Prelude hiding (span)
 
 data Token
