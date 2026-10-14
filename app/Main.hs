@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Data.ByteString.Lazy.Char8 qualified as BS
-import Frontend.KNormal (kNormal)
+import Frontend.KNormal (kNormal, prettyKNormal)
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
 
@@ -13,4 +13,4 @@ main = do
     Right syntax -> do
       print syntax
       let knorm = kNormal syntax
-      print knorm
+      putStrLn . BS.unpack . prettyKNormal $ knorm
