@@ -1,13 +1,8 @@
-module Frontend.Syntax (Name (..), Syntax (..), SyntaxKind (..), FunBind (..)) where
+module Frontend.Syntax (Syntax (..), SyntaxKind (..), FunBind (..)) where
 
-import Data.ByteString.Lazy.Char8 qualified as BS
+import Frontend.Id (Id)
 
-data Name a = Name {ann :: a, name :: BS.ByteString}
-  deriving stock (Eq, Functor, Foldable, Traversable)
-
-instance Show (Name a) where
-  show Name {name} = BS.unpack name
-
+-- TODO: monomorphic
 data Syntax a = Syntax {ann :: a, kind :: SyntaxKind a}
   deriving stock (Eq, Functor, Foldable, Traversable)
 
@@ -33,20 +28,20 @@ data SyntaxKind a
   | Eq (Syntax a) (Syntax a)
   | Le (Syntax a) (Syntax a)
   | If (Syntax a) (Syntax a) (Syntax a)
-  | Let (Name a) (Syntax a) (Syntax a)
-  | Var (Name a)
+  | Let Id (Syntax a) (Syntax a)
+  | Var Id
   | LetRec (FunBind a) (Syntax a)
   | App (Syntax a) [Syntax a]
-  | Tuple [(Syntax a)]
-  | LetTuple [Name a] (Syntax a) (Syntax a)
+  | Tuple [Syntax a]
+  | LetTuple [Id] (Syntax a) (Syntax a)
   | Array (Syntax a) (Syntax a)
   | Get (Syntax a) (Syntax a)
   | Put (Syntax a) (Syntax a) (Syntax a)
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
 
 data FunBind a = FunBind
-  { name :: Name a
-  , args :: [Name a]
+  { name :: Id
+  , args :: [Id]
   , body :: Syntax a
   }
   deriving stock (Eq, Show, Functor, Foldable, Traversable)

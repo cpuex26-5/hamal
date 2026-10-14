@@ -45,6 +45,8 @@ library
   import: defaults
   -- cabal-gild: discover src
   exposed-modules:
+    Frontend.Id
+    Frontend.KNormal
     Frontend.Lexer
     Frontend.Parser
     Frontend.Span

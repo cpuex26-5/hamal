@@ -3,10 +3,11 @@ module Frontend.Parser (parse) where
 
 import Data.Foldable1
 import Data.List.NonEmpty
+import Frontend.Id
 import Frontend.Lexer
-import Frontend.Token
 import Frontend.Syntax
 import Frontend.Span
+import Frontend.Token
 }
 
 %name parse
@@ -84,18 +85,15 @@ expr :: { Syntax Span }
   | expr '<=' expr { Syntax ($1.ann <> $3.ann) (Le $1 $3) }
   | expr '>=' expr { Syntax ($1.ann <> $3.ann) (Le $3 $1) }
   | if expr then expr else expr %prec prec_if { Syntax ($1 <> $6.ann) $ If $2 $4 $6 }
-  | let name '=' expr in expr %prec prec_let { Syntax ($1 <> $6.ann) $ Let $2 $4 $6 }
+  | let ident '=' expr in expr %prec prec_let { Syntax ($1 <> $6.ann) $ Let (Id $2.value) $4 $6 }
   | let rec funbind in expr %prec prec_let { Syntax ($1 <> $5.ann) $ LetRec $3 $5 }
   | simple_expr parameters %prec prec_app { Syntax (foldMap1 (.ann) ($1 :| $2)) $ App $1 $2 }
   | elems %prec prec_tuple { Syntax (foldMap1 (.ann) $1) $ Tuple (toList $1) }
   | let '(' pattern ')' '=' expr in expr { Syntax ($1 <> $8.ann) $ LetTuple $3 $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { Syntax ($1.ann <> $7.ann) $ Put $1 $4 $7 }
-  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (Name $1.ann "_") $1 $3 } {- interim: $1.ann -}
+  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (Id "_") $1 $3 }
   | arraycreate simple_expr simple_expr %prec prec_app { Syntax ($1 <> $3.ann) $ Array $2 $3 }
 
-
-name :: { Name Span }
-  : ident { Name $1.span $1.value }
 
 simple_expr :: { Syntax Span }
   : '(' expr ')'  { $2 { ann = $1 <> $3 } }
@@ -103,15 +101,15 @@ simple_expr :: { Syntax Span }
   | bool  { Syntax $1.span (Bool $1.value) }
   | int  { Syntax $1.span (Int $1.value) }
   | float  { Syntax $1.span (Float $1.value) }
-  | name  { Syntax $1.ann (Var $1) }
+  | ident  { Syntax $1.span (Var (Id $1.value)) }
   | simple_expr '.' '(' expr ')'  { Syntax ($1.ann <> $5) (Get $1 $4) }
 
 funbind :: { FunBind Span }
-  : name arguments '=' expr { FunBind $1 $2 $4 }
+  : ident arguments '=' expr { FunBind (Id $1.value) $2 $4 }
 
-arguments :: { [Name Span] }
-  : name arguments { $1 : $2 }
-  | name { [$1] }
+arguments :: { [Id] }
+  : ident arguments { Id $1.value : $2 }
+  | ident { [Id $1.value] }
 
 parameters :: { [Syntax Span] }
   : parameters simple_expr %prec prec_app { $1 <> [$2] }
@@ -121,9 +119,9 @@ elems :: { NonEmpty (Syntax Span) }
   : elems ',' expr { $1 <> pure $3 }
   | expr ',' expr { $1 :| pure $3 }
 
-pattern :: { [Name Span] }
-  : pattern ',' name { $1 <> [$3] }
-  | name ',' name { [$1, $3] }
+pattern :: { [Id] }
+  : pattern ',' ident { $1 <> [Id $3.value] }
+  | ident ',' ident { [Id $1.value, Id $3.value] }
 
 {
 parseError :: Spanned Token -> Alex a
