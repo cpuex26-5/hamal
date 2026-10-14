@@ -42,6 +42,6 @@ data SyntaxKind a
 data FunBind a = FunBind
   { name :: Id
   , args :: [Id]
-  , body :: Syntax a
+  , rhs :: Syntax a
   }
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
