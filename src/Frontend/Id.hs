@@ -1,6 +1,6 @@
-module Frontend.Id (Id (..), Counter, freshId, initialCounter, buildId) where
+module Frontend.Id (Id (..), Fresh, buildId, freshId, freshTmpId, runFresh) where
 
-import Control.Monad.Trans.State (State, get, modify)
+import Control.Monad.Trans.State (State, evalState, get, modify)
 import Data.ByteString.Builder (intDec, lazyByteString, toLazyByteString)
 import Data.ByteString.Builder qualified as BB
 import Data.ByteString.Lazy.Char8 qualified as BS
@@ -11,16 +11,16 @@ newtype Id = Id BS.ByteString
 buildId :: Id -> BB.Builder
 buildId (Id ident) = lazyByteString ident
 
-newtype Counter = Counter Int
+type Fresh a = State Int a
 
-initialCounter :: Counter
-initialCounter = Counter 0
+runFresh :: Fresh a -> a
+runFresh m = evalState m 0
 
-increment :: Counter -> Counter
-increment (Counter cnt) = Counter (cnt + 1)
+freshId :: Id -> Fresh Id
+freshId ident = do
+  counter <- get
+  modify (+ 1)
+  pure . Id . toLazyByteString $ buildId ident <> "." <> intDec counter
 
-freshId :: State Counter Id
-freshId = do
-  modify increment
-  Counter cnt <- get
-  pure . Id . toLazyByteString $ "T" <> intDec cnt
+freshTmpId :: Fresh Id
+freshTmpId = freshId (Id "T")
