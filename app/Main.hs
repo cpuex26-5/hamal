@@ -3,9 +3,10 @@ module Main (main) where
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Frontend.Alpha (alphaConvert)
 import Frontend.Id (runFresh)
-import Frontend.KNormal (kNormal, prettyKNormal)
+import Frontend.KNormal (kNormal)
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
+import Text.Pretty.Simple qualified as P
 
 main :: IO ()
 main = do
@@ -13,11 +14,14 @@ main = do
   case runAlex input parse of
     Left err -> putStrLn err
     Right syntax -> do
-      putStrLn "---------- syntax ----------"
-      print syntax
       let knorm = kNormal syntax
       let alpha = alphaConvert knorm
+      putStrLn "---------- syntax ----------"
+      dump syntax
       putStrLn "---------- knorm ----------"
-      putStrLn . BS.unpack . prettyKNormal . runFresh $ knorm
+      dump . runFresh $ knorm
       putStrLn "---------- alpha ----------"
-      putStrLn . BS.unpack . prettyKNormal . runFresh $ alpha
+      dump . runFresh $ alpha
+  where
+    dump :: (Show a) => a -> IO ()
+    dump = P.pPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True}

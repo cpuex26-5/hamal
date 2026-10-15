@@ -62,8 +62,8 @@ library
   build-depends:
     array,
     bytestring,
+    containers,
     transformers,
-    containers
 
   hs-source-dirs: src
 
@@ -73,6 +73,7 @@ executable hamal
   build-depends:
     bytestring,
     hamal,
+    pretty-simple,
 
   hs-source-dirs: app
 

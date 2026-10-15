@@ -1,13 +1,7 @@
-module Frontend.KNormal (KNormal (..), FunBind (..), kNormal, prettyKNormal) where
+module Frontend.KNormal (KNormal (..), FunBind (..), kNormal) where
 
 import Data.Bool (bool)
-import Data.ByteString.Builder (intDec, toLazyByteString)
-import Data.ByteString.Builder qualified as BB
-import Data.ByteString.Builder.RealFloat (floatDec)
-import Data.ByteString.Lazy.Char8 qualified as BS
-import Data.List (intersperse)
-import Data.Semigroup (stimes)
-import Frontend.Id (Fresh, Id (..), buildId, freshTmpId)
+import Frontend.Id (Fresh, Id (..), freshTmpId)
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
 
@@ -43,37 +37,6 @@ data FunBind = FunBind
   , rhs :: KNormal
   }
   deriving stock (Show, Eq)
-
-prettyKNormal :: KNormal -> BS.ByteString
-prettyKNormal = toLazyByteString . go 0
-  where
-    go :: Int -> KNormal -> BB.Builder
-    go level expr =
-      stimes (level * 2) " "
-        <> case expr of
-          Unit -> "Unit"
-          Int int -> spaced ["Int", intDec int]
-          Float float -> spaced ["Float", floatDec float]
-          Neg ident -> spaced ["Neg", buildId ident]
-          Add lhs rhs -> spaced ["Add", buildId lhs, buildId rhs]
-          Sub lhs rhs -> spaced ["Sub", buildId lhs, buildId rhs]
-          FNeg ident -> spaced ["FNeg", buildId ident]
-          FAdd lhs rhs -> spaced ["FAdd", buildId lhs, buildId rhs]
-          FSub lhs rhs -> spaced ["FSub", buildId lhs, buildId rhs]
-          FMul lhs rhs -> spaced ["FMul", buildId lhs, buildId rhs]
-          FDiv lhs rhs -> spaced ["FDiv", buildId lhs, buildId rhs]
-          IfEq lhs rhs thn els -> spaced ["IfEq", buildId lhs, buildId rhs] <> "\n" <> go (level + 1) thn <> "\n" <> go (level + 1) els
-          IfLe lhs rhs thn els -> spaced ["IfLe", buildId lhs, buildId rhs] <> "\n" <> go (level + 1) thn <> "\n" <> go (level + 1) els
-          Let binder rhs body -> spaced ["Let", buildId binder] <> "\n" <> go (level + 1) rhs <> "\n" <> go (level + 1) body
-          Var ident -> spaced ["Var", buildId ident]
-          LetRec FunBind {name, args, rhs} body -> spaced (["LetRec", buildId name] <> (buildId <$> args)) <> "\n" <> go (level + 1) rhs <> "\n" <> go (level + 1) body
-          App fun params -> spaced $ ["App", buildId fun] <> (buildId <$> params)
-          Tuple idents -> spaced $ "Tuple" : (buildId <$> idents)
-          LetTuple binders rhs body -> spaced ("LetTuple" : (buildId <$> binders) <> [buildId rhs]) <> "\n" <> go (level + 1) body
-          Get arr idx -> spaced ["Get", buildId arr, buildId idx]
-          Put arr idx rhs -> spaced ["Put", buildId arr, buildId idx, buildId rhs]
-
-    spaced = mconcat . intersperse " "
 
 insertLet :: Fresh KNormal -> (Id -> Fresh KNormal) -> Fresh KNormal
 insertLet scrutM k = do
