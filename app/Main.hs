@@ -2,6 +2,7 @@ module Main (main) where
 
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Frontend.Alpha (alphaConvert)
+import Frontend.Assoc (assocLet)
 import Frontend.Beta (betaConvert)
 import Frontend.Id (runFresh)
 import Frontend.KNormal (kNormal)
@@ -18,6 +19,7 @@ main = do
       let knorm = kNormal syntax
       let alpha = alphaConvert knorm
       let beta = betaConvert <$> alpha
+      let assoc = assocLet <$> beta
       putStrLn "---------- syntax ----------"
       dump syntax
       putStrLn "---------- knorm ----------"
@@ -26,6 +28,8 @@ main = do
       dump . runFresh $ alpha
       putStrLn "---------- beta ----------"
       dump . runFresh $ beta
+      putStrLn "---------- assoc ----------"
+      dump . runFresh $ assoc
   where
     dump :: (Show a) => a -> IO ()
     dump = P.pPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True}
