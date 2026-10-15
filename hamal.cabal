@@ -1,4 +1,4 @@
-cabal-version: 3.16
+cabal-version: 3.14
 name: hamal
 version: 0.1.0.0
 license: BSD-3-Clause
@@ -32,9 +32,9 @@ common defaults
     DuplicateRecordFields
     MultiWayIf
     NoFieldSelectors
+    OrPatterns
     OverloadedRecordDot
     OverloadedStrings
-    OrPatterns
     RecordWildCards
     StrictData
     ViewPatterns
@@ -46,6 +46,7 @@ library
   import: defaults
   -- cabal-gild: discover src
   exposed-modules:
+    Frontend.Alpha
     Frontend.Id
     Frontend.KNormal
     Frontend.Lexer
@@ -61,7 +62,8 @@ library
   build-depends:
     array,
     bytestring,
-    transformers
+    transformers,
+    containers
 
   hs-source-dirs: src
 

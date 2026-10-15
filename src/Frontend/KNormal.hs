@@ -1,4 +1,4 @@
-module Frontend.KNormal (KNormal (..), kNormal, prettyKNormal) where
+module Frontend.KNormal (KNormal (..), FunBind (..), kNormal, prettyKNormal) where
 
 import Data.Bool (bool)
 import Data.ByteString.Builder (intDec, toLazyByteString)
