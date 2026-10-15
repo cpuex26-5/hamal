@@ -47,6 +47,7 @@ library
   -- cabal-gild: discover src
   exposed-modules:
     Frontend.Alpha
+    Frontend.Beta
     Frontend.Id
     Frontend.KNormal
     Frontend.Lexer
