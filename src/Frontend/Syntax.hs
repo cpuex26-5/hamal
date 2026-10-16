@@ -1,6 +1,6 @@
 module Frontend.Syntax (Syntax (..), SyntaxKind (..), FunBind (..)) where
 
-import Frontend.Id (Id)
+import Id (Id)
 
 -- TODO: monomorphic
 data Syntax a = Syntax {ann :: a, kind :: SyntaxKind a}

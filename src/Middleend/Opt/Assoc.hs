@@ -1,6 +1,6 @@
-module Frontend.Assoc (assocLet) where
+module Middleend.Opt.Assoc (assocLet) where
 
-import Frontend.KNormal (FunBind (..), KNormal (..))
+import Middleend.KNormal (FunBind (..), KNormal (..))
 
 assocLet :: KNormal -> KNormal
 assocLet = \case

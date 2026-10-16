@@ -1,10 +1,10 @@
-module Frontend.Beta (betaConvert) where
+module Middleend.Opt.Beta (betaConvert) where
 
 import Control.Monad.Trans.State (State, evalState, gets, modify)
 import Data.Function (on)
 import Data.Map qualified as M
-import Frontend.Id (Id)
-import Frontend.KNormal (FunBind (..), KNormal (..))
+import Id (Id)
+import Middleend.KNormal (FunBind (..), KNormal (..))
 
 betaConvert :: KNormal -> KNormal
 betaConvert expr = evalState (go expr) M.empty

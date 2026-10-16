@@ -13,18 +13,18 @@ common defaults
   ghc-options:
     -Wall
     -Wcompat
+    -Wdefaulted-exception-context
     -Widentities
-    -Wredundant-constraints
-    -Wmissing-export-lists
-    -Wpartial-fields
-    -Werror=missing-deriving-strategies
-    -Wunused-packages
     -Winvalid-haddock
-    -Wredundant-bang-patterns
+    -Wmissing-export-lists
+    -Wmissing-deriving-strategies
     -Woperator-whitespace
+    -Wpartial-fields
+    -Wredundant-constraints
+    -Wredundant-bang-patterns
     -Wredundant-strictness-flags
     -Wterm-variable-capture
-    -Wdefaulted-exception-context
+    -Wunused-packages
     -fhide-source-paths
 
   default-extensions:
@@ -46,16 +46,16 @@ library
   import: defaults
   -- cabal-gild: discover src
   exposed-modules:
-    Frontend.Alpha
-    Frontend.Assoc
-    Frontend.Beta
-    Frontend.Id
-    Frontend.KNormal
     Frontend.Lexer
     Frontend.Parser
-    Frontend.Span
+    Frontend.SrcSpan
     Frontend.Syntax
     Frontend.Token
+    Id
+    Middleend.KNormal
+    Middleend.Opt.Alpha
+    Middleend.Opt.Assoc
+    Middleend.Opt.Beta
 
   build-tool-depends:
     alex:alex,

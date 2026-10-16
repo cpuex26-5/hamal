@@ -1,11 +1,11 @@
-module Frontend.Alpha (alphaConvert) where
+module Middleend.Opt.Alpha (alphaConvert) where
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (StateT, evalStateT, gets, modify)
 import Data.Function (on)
 import Data.Map qualified as M
-import Frontend.Id (Fresh, Id, refresh)
-import Frontend.KNormal (FunBind (..), KNormal (..))
+import Id (Fresh, Id, refresh)
+import Middleend.KNormal (FunBind (..), KNormal (..))
 
 alphaConvert :: Fresh KNormal -> Fresh KNormal
 alphaConvert exprM = do

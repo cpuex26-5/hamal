@@ -1,4 +1,4 @@
-module Frontend.Id (Id (..), Fresh, buildId, refresh, freshTmpId, runFresh) where
+module Id (Id (..), Label (..), Fresh, buildId, refresh, freshTmpId, runFresh) where
 
 import Control.Monad.Trans.State (State, evalState, get, modify)
 import Data.ByteString.Builder (intDec, lazyByteString, toLazyByteString)
@@ -6,6 +6,9 @@ import Data.ByteString.Builder qualified as BB
 import Data.ByteString.Lazy.Char8 qualified as BS
 
 newtype Id = Id BS.ByteString
+  deriving newtype (Eq, Ord, Show)
+
+newtype Label = Label BS.ByteString
   deriving newtype (Eq, Ord, Show)
 
 buildId :: Id -> BB.Builder

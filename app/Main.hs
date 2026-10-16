@@ -1,13 +1,13 @@
 module Main (main) where
 
 import Data.ByteString.Lazy.Char8 qualified as BS
-import Frontend.Alpha (alphaConvert)
-import Frontend.Assoc (assocLet)
-import Frontend.Beta (betaConvert)
-import Frontend.Id (runFresh)
-import Frontend.KNormal (kNormal)
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
+import Id (runFresh)
+import Middleend.KNormal (kNormal)
+import Middleend.Opt.Alpha (alphaConvert)
+import Middleend.Opt.Assoc (assocLet)
+import Middleend.Opt.Beta (betaConvert)
 import Text.Pretty.Simple qualified as P
 
 main :: IO ()

@@ -1,9 +1,9 @@
-module Frontend.KNormal (KNormal (..), FunBind (..), kNormal) where
+module Middleend.KNormal (KNormal (..), FunBind (..), kNormal) where
 
 import Data.Bool (bool)
-import Frontend.Id (Fresh, Id (..), freshTmpId)
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
+import Id (Fresh, Id (..), freshTmpId)
 
 data KNormal
   = Unit

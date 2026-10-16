@@ -3,18 +3,18 @@ module Frontend.Parser (parse) where
 
 import Data.Foldable1
 import Data.List.NonEmpty
-import Frontend.Id
 import Frontend.Lexer
+import Frontend.SrcSpan
 import Frontend.Syntax
-import Frontend.Span
 import Frontend.Token
+import Id
 }
 
 %name parse
-%tokentype { Spanned Token }
+%tokentype { Located Token }
 %error { parseError }
 %monad { Alex } { >>= } { pure }
-%lexer { lexer } { Spanned { value = TEof } }
+%lexer { lexer } { Located { value = TEof } }
 %expect 0
 
 %token
@@ -65,7 +65,7 @@ import Frontend.Token
 
 %%
 
-expr :: { Syntax Span }
+expr :: { Syntax SrcSpan }
   : simple_expr { $1 }
   | not expr %prec prec_app { Syntax ($1 <> $2.ann) (Not $2) }
   | '-' expr %prec prec_unary_minus { case $2.kind of
@@ -95,7 +95,7 @@ expr :: { Syntax Span }
   | arraycreate simple_expr simple_expr %prec prec_app { Syntax ($1 <> $3.ann) $ Array $2 $3 }
 
 
-simple_expr :: { Syntax Span }
+simple_expr :: { Syntax SrcSpan }
   : '(' expr ')'  { $2 { ann = $1 <> $3 } }
   | '(' ')'  { Syntax ($1 <> $2) Unit }
   | bool  { Syntax $1.span (Bool $1.value) }
@@ -104,18 +104,18 @@ simple_expr :: { Syntax Span }
   | ident  { Syntax $1.span (Var (Id $1.value)) }
   | simple_expr '.' '(' expr ')'  { Syntax ($1.ann <> $5) (Get $1 $4) }
 
-funbind :: { FunBind Span }
+funbind :: { FunBind SrcSpan }
   : ident arguments '=' expr { FunBind (Id $1.value) $2 $4 }
 
 arguments :: { [Id] }
   : ident arguments { Id $1.value : $2 }
   | ident { [Id $1.value] }
 
-parameters :: { [Syntax Span] }
+parameters :: { [Syntax SrcSpan] }
   : parameters simple_expr %prec prec_app { $1 <> [$2] }
   | simple_expr %prec prec_app { [$1] }
 
-elems :: { NonEmpty (Syntax Span) }
+elems :: { NonEmpty (Syntax SrcSpan) }
   : elems ',' expr { $1 <> pure $3 }
   | expr ',' expr { $1 :| pure $3 }
 
@@ -124,11 +124,11 @@ pattern :: { [Id] }
   | ident ',' ident { [Id $1.value, Id $3.value] }
 
 {
-parseError :: Spanned Token -> Alex a
+parseError :: Located Token -> Alex a
 parseError _ = do
   (AlexPn _ line column, _, _, _) <- alexGetInput
   alexError $ "Parse error at line " <> show line <> ", column " <> show column
 
-lexer :: (Spanned Token -> Alex a) -> Alex a
+lexer :: (Located Token -> Alex a) -> Alex a
 lexer = (=<< alexMonadScan)
 }

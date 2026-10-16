@@ -2,7 +2,7 @@ module Frontend.Token (Token (..), symbol, literal, identOf, intOf, floatOf, boo
 
 import Control.Monad (guard)
 import Data.ByteString.Lazy.Char8 qualified as BS
-import Frontend.Span (Span, Spanned (..))
+import Frontend.SrcSpan (Located (..), SrcSpan)
 import Prelude hiding (span)
 
 data Token
@@ -39,10 +39,10 @@ data Token
   | TEof
   deriving stock (Eq, Show)
 
-symbol :: Token -> Spanned Token -> Maybe Span
-symbol token Spanned {value, span} = span <$ guard (value == token)
+symbol :: Token -> Located Token -> Maybe SrcSpan
+symbol token Located {value, span} = span <$ guard (value == token)
 
-literal :: (Token -> Maybe a) -> Spanned Token -> Maybe (Spanned a)
+literal :: (Token -> Maybe a) -> Located Token -> Maybe (Located a)
 literal = traverse
 
 identOf :: Token -> Maybe BS.ByteString
