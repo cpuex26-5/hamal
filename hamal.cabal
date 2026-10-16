@@ -52,6 +52,7 @@ library
     Frontend.Syntax
     Frontend.Token
     Id
+    Middleend.Closure
     Middleend.KNormal
     Middleend.Opt.Alpha
     Middleend.Opt.Assoc

@@ -4,6 +4,7 @@ import Data.ByteString.Lazy.Char8 qualified as BS
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
 import Id (runFresh)
+import Middleend.Closure (closureConvert)
 import Middleend.KNormal (kNormal)
 import Middleend.Opt.Alpha (alphaConvert)
 import Middleend.Opt.Assoc (assocLet)
@@ -20,6 +21,7 @@ main = do
       let alpha = alphaConvert knorm
       let beta = betaConvert <$> alpha
       let assoc = assocLet <$> beta
+      let closured = closureConvert <$> assoc
       putStrLn "---------- syntax ----------"
       dump syntax
       putStrLn "---------- knorm ----------"
@@ -30,6 +32,8 @@ main = do
       dump . runFresh $ beta
       putStrLn "---------- assoc ----------"
       dump . runFresh $ assoc
+      putStrLn "---------- closure ----------"
+      dump . runFresh $ closured
   where
     dump :: (Show a) => a -> IO ()
     dump = P.pPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True}

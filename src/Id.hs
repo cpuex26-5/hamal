@@ -1,4 +1,4 @@
-module Id (Id (..), Label (..), Fresh, buildId, refresh, freshTmpId, runFresh) where
+module Id (Id (..), Label, Fresh, constantify, buildId, refresh, freshTmpId, runFresh) where
 
 import Control.Monad.Trans.State (State, evalState, get, modify)
 import Data.ByteString.Builder (intDec, lazyByteString, toLazyByteString)
@@ -10,6 +10,9 @@ newtype Id = Id BS.ByteString
 
 newtype Label = Label BS.ByteString
   deriving newtype (Eq, Ord, Show)
+
+constantify :: Id -> Label
+constantify (Id ident) = Label ident
 
 buildId :: Id -> BB.Builder
 buildId (Id ident) = lazyByteString ident
