@@ -42,7 +42,7 @@ data FunDef = FunDef
   { name :: Label
   , args :: [Id]
   , formalFv :: [Id]
-  , body :: Expr
+  , rhs :: Expr
   }
   deriving stock (Eq, Show)
 
@@ -75,7 +75,7 @@ closureConvert = uncurry (flip Program) . runWriter . go
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
         let closure = Closure {entry = constantify name, actualFv = fv}
         body' <- go body
-        tell [FunDef {name = constantify name, args, formalFv = fv, body = rhs'}]
+        tell [FunDef {name = constantify name, args, formalFv = fv, rhs = rhs'}]
         pure $ MakeCls name closure body'
       K.App fun params -> pure $ AppCls fun params
       K.Tuple idents -> pure $ Tuple idents

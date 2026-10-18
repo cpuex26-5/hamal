@@ -17,6 +17,7 @@ data Inst
   | Neg Id
   | Sub Id Id
   | Lw Int Id
+  | Lwl Int Label
   | Sw Id Id Int
   | IfEq Id Id Block Block
   | IfLe Id Id Block Block

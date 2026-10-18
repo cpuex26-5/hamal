@@ -1,6 +1,6 @@
 module Backend.Riscv.Virtual (genVirtual) where
 
-import Backend.Riscv.Asm (Block (..), Inst (..), Program (..), regHeap)
+import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), regHeap)
 import Control.Monad (foldM)
 import Id (Fresh, Id (..), freshTmpId, refresh)
 import Middleend.Closure qualified as C
@@ -42,5 +42,11 @@ virtualBlock = \case
       Ans inst -> Let binder inst body
       Let binder' rhs' body' -> Let binder' rhs' $ insertLet binder body' body
 
+virtualFunc :: C.FunDef -> Fresh FunDef
+virtualFunc C.FunDef {name, args, formalFv, rhs} = do
+  rhs' <- virtualBlock rhs
+  let (_, load) = foldr (\fv (offset, rest) -> (offset + 4, Let fv (Lwl offset name) rest)) (4, rhs') formalFv
+  pure $ FunDef {name, args, rhs = load}
+
 genVirtual :: C.Program -> Fresh Program
-genVirtual (C.Program _fundefs expr) = Program [] <$> virtualBlock expr
+genVirtual (C.Program fundefs expr) = Program <$> traverse virtualFunc fundefs <*> virtualBlock expr
