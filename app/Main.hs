@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Backend.Riscv.Virtual (genVirtual)
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
@@ -22,6 +23,7 @@ main = do
       let beta = betaConvert <$> alpha
       let assoc = assocLet <$> beta
       let closured = closureConvert <$> assoc
+      let virtual = genVirtual =<< closured
       putStrLn "---------- syntax ----------"
       dump syntax
       putStrLn "---------- knorm ----------"
@@ -34,6 +36,8 @@ main = do
       dump . runFresh $ assoc
       putStrLn "---------- closure ----------"
       dump . runFresh $ closured
+      putStrLn "---------- virtual ----------"
+      dump . runFresh $ virtual
   where
     dump :: (Show a) => a -> IO ()
     dump = P.pPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True}

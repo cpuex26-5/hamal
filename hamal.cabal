@@ -46,6 +46,8 @@ library
   import: defaults
   -- cabal-gild: discover src
   exposed-modules:
+    Backend.Riscv.Asm
+    Backend.Riscv.Virtual
     Frontend.Lexer
     Frontend.Parser
     Frontend.SrcSpan
