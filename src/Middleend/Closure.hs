@@ -28,10 +28,10 @@ data Exp
   | IfLe Id Id Exp Exp
   | Let Id Exp Exp
   | Var Id
-  | MakeCls Id Closure Exp
-  | AppCls Id [Id]
-  | -- | AppDir Label [Id]
-    Tuple [Id]
+  | -- \| MakeCls Id Closure Exp
+    -- \| AppCls Id [Id]
+    AppDir Label [Id]
+  | Tuple [Id]
   | LetTuple [Id] Id Exp
   | Get Id Id
   | Put Id Id Id
@@ -49,7 +49,6 @@ data FunDef = FunDef
 data Program = Program [FunDef] Exp
   deriving stock (Eq, Show)
 
--- TODO: Direct App
 closureConvert :: K.Exp -> Program
 closureConvert = uncurry (flip Program) . runWriter . go
   where
@@ -73,11 +72,10 @@ closureConvert = uncurry (flip Program) . runWriter . go
       K.LetRec FunBind {name, args, rhs} body -> do
         rhs' <- go rhs
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
-        let closure = Closure {entry = constantify name, actualFv = fv}
         body' <- go body
         tell [FunDef {name = constantify name, args, formalFv = fv, rhs = rhs'}]
-        pure $ MakeCls name closure body'
-      K.App fun params -> pure $ AppCls fun params
+        pure body'
+      K.App fun params -> pure $ AppDir (constantify fun) params
       K.Tuple idents -> pure $ Tuple idents
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> go body
       K.Get arr idx -> pure $ Get arr idx
@@ -97,8 +95,9 @@ closureConvert = uncurry (flip Program) . runWriter . go
       IfLe lhs rhs thn els -> S.fromList [lhs, rhs] <> freeVars thn <> freeVars els
       Let binder rhs body -> S.difference (freeVars rhs <> freeVars body) $ S.singleton binder
       Var ident -> S.singleton ident
-      MakeCls binder Closure {actualFv} body -> S.delete binder $ S.fromList actualFv <> freeVars body
-      AppCls fun params -> S.fromList $ fun : params
+      -- MakeCls binder Closure {actualFv} body -> S.delete binder $ S.fromList actualFv <> freeVars body
+      -- AppCls fun params -> S.fromList $ fun : params
+      AppDir _ params -> S.fromList params
       Tuple idents -> S.fromList idents
       LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList binders
       Get arr idx -> S.fromList [arr, idx]

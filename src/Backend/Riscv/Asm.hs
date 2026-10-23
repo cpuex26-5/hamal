@@ -21,7 +21,7 @@ data Inst
   | Sw Id Id Int
   | IfEq Id Id Block Block
   | IfLe Id Id Block Block
-  | CallCls Id [Id]
+  | CallDir Label [Id]
   deriving stock (Show, Eq)
 
 data FunDef = FunDef

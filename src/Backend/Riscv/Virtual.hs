@@ -1,8 +1,7 @@
 module Backend.Riscv.Virtual (genVirtual) where
 
-import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), regHeap)
-import Control.Monad (foldM)
-import Id (Fresh, Id (..), freshTmpId, refresh)
+import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..))
+import Id (Fresh)
 import Middleend.Closure qualified as C
 
 virtualBlock :: C.Exp -> Fresh Block
@@ -22,22 +21,23 @@ virtualBlock = \case
   C.IfLe lhs rhs thn els -> (\thn' els' -> Ans $ IfLe lhs rhs thn' els') <$> virtualBlock thn <*> virtualBlock els
   C.Let binder rhs body -> insertLet binder <$> virtualBlock rhs <*> virtualBlock body
   C.Var ident -> pure . Ans . Mv $ ident
-  C.MakeCls binder C.Closure {entry, actualFv} body -> do
-    body' <- virtualBlock body
-    (offset, storedFreeVars) <- foldM (\(offset, rest) fv -> (offset + 4,) <$> sequenced (Sw fv binder offset) rest) (4, body') actualFv
-    label <- Id.refresh (Id "l")
-    inner <- sequenced (Sw label binder 0) storedFreeVars
-    pure
-      $ Let binder (Mv regHeap)
-      $ Let regHeap (Addi regHeap offset)
-      $ Let label (La entry) inner
-  C.AppCls fun params -> pure . Ans $ CallCls fun params
+  -- C.MakeCls binder C.Closure {entry, actualFv} body -> do
+  --   body' <- virtualBlock body
+  --   (offset, storedFreeVars) <- foldM (\(offset, rest) fv -> (offset + 4,) <$> sequenced (Sw fv binder offset) rest) (4, body') actualFv
+  --   label <- Id.refresh (Id "l")
+  --   inner <- sequenced (Sw label binder 0) storedFreeVars
+  --   pure
+  --     $ Let binder (Mv regHeap)
+  --     $ Let regHeap (Addi regHeap offset)
+  --     $ Let label (La entry) inner
+  -- C.AppCls fun params -> pure . Ans $ CallCls fun params
+  C.AppDir fun params -> pure . Ans $ CallDir fun params
   C.Tuple _idents -> undefined
   C.LetTuple _binders _rhs _body -> undefined
   C.Get _arr _idx -> undefined
   C.Put _arr _idx _rhs -> undefined
   where
-    sequenced e1 e2 = Let <$> Id.freshTmpId <*> pure e1 <*> pure e2
+    -- sequenced e1 e2 = Let <$> Id.freshTmpId <*> pure e1 <*> pure e2
     insertLet binder rhs body = case rhs of
       Ans inst -> Let binder inst body
       Let binder' rhs' body' -> Let binder' rhs' $ insertLet binder body' body
