@@ -5,7 +5,7 @@ import Control.Monad (foldM)
 import Id (Fresh, Id (..), freshTmpId, refresh)
 import Middleend.Closure qualified as C
 
-virtualBlock :: C.Expr -> Fresh Block
+virtualBlock :: C.Exp -> Fresh Block
 virtualBlock = \case
   C.Unit -> pure $ Ans Nop
   C.Int int -> pure $ Ans (Li int)

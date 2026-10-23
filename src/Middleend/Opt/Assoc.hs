@@ -1,8 +1,8 @@
 module Middleend.Opt.Assoc (assocLet) where
 
-import Middleend.KNormal (FunBind (..), KNormal (..))
+import Middleend.KNormal (Exp (..), FunBind (..))
 
-assocLet :: KNormal -> KNormal
+assocLet :: Exp -> Exp
 assocLet = \case
   IfEq lhs rhs thn els -> IfEq lhs rhs (assocLet thn) (assocLet els)
   IfLe lhs rhs thn els -> IfLe lhs rhs (assocLet thn) (assocLet els)

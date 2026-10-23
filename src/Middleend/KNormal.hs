@@ -1,11 +1,11 @@
-module Middleend.KNormal (KNormal (..), FunBind (..), kNormal) where
+module Middleend.KNormal (Exp (..), FunBind (..), kNormal) where
 
 import Data.Bool (bool)
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
 import Id (Fresh, Id (..), freshTmpId)
 
-data KNormal
+data Exp
   = Unit
   | Int Int
   | Float Float
@@ -17,14 +17,14 @@ data KNormal
   | FSub Id Id
   | FMul Id Id
   | FDiv Id Id
-  | IfEq Id Id KNormal KNormal
-  | IfLe Id Id KNormal KNormal
-  | Let Id KNormal KNormal
+  | IfEq Id Id Exp Exp
+  | IfLe Id Id Exp Exp
+  | Let Id Exp Exp
   | Var Id
-  | LetRec FunBind KNormal
+  | LetRec FunBind Exp
   | App Id [Id]
   | Tuple [Id]
-  | LetTuple [Id] Id KNormal
+  | LetTuple [Id] Id Exp
   | Get Id Id
   | Put Id Id Id
   -- \| ExtArray Id
@@ -34,11 +34,11 @@ data KNormal
 data FunBind = FunBind
   { name :: Id
   , args :: [Id]
-  , rhs :: KNormal
+  , rhs :: Exp
   }
   deriving stock (Show, Eq)
 
-insertLet :: Fresh KNormal -> (Id -> Fresh KNormal) -> Fresh KNormal
+insertLet :: Fresh Exp -> (Id -> Fresh Exp) -> Fresh Exp
 insertLet scrutM k = do
   scrut <- scrutM
   case scrut of
@@ -48,7 +48,7 @@ insertLet scrutM k = do
       body <- k fresh
       pure $ Let fresh scrut body
 
-kNormal :: Syntax a -> Fresh KNormal
+kNormal :: Syntax a -> Fresh Exp
 kNormal Syntax {ann, kind} = case kind of
   S.Unit -> pure Unit
   S.Int int -> pure $ Int int

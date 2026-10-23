@@ -4,12 +4,12 @@ import Control.Monad.Trans.State (State, evalState, gets, modify)
 import Data.Function (on)
 import Data.Map qualified as M
 import Id (Id)
-import Middleend.KNormal (FunBind (..), KNormal (..))
+import Middleend.KNormal (Exp (..), FunBind (..))
 
-betaConvert :: KNormal -> KNormal
+betaConvert :: Exp -> Exp
 betaConvert expr = evalState (go expr) M.empty
   where
-    go :: KNormal -> State (M.Map Id Id) KNormal
+    go :: Exp -> State (M.Map Id Id) Exp
     go expr' = do
       resolve <- gets (\m ident -> M.findWithDefault ident ident m)
       case expr' of

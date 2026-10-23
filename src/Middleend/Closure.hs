@@ -1,4 +1,4 @@
-module Middleend.Closure (Closure (..), Expr (..), FunDef (..), Program (..), closureConvert) where
+module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
 
 import Control.Monad.Trans.Writer (Writer, runWriter, tell)
 import Data.Set qualified as S
@@ -12,7 +12,7 @@ data Closure = Closure
   }
   deriving stock (Eq, Show)
 
-data Expr
+data Exp
   = Unit
   | Int Int
   | Float Float
@@ -24,15 +24,15 @@ data Expr
   | FSub Id Id
   | FMul Id Id
   | FDiv Id Id
-  | IfEq Id Id Expr Expr
-  | IfLe Id Id Expr Expr
-  | Let Id Expr Expr
+  | IfEq Id Id Exp Exp
+  | IfLe Id Id Exp Exp
+  | Let Id Exp Exp
   | Var Id
-  | MakeCls Id Closure Expr
+  | MakeCls Id Closure Exp
   | AppCls Id [Id]
   | -- | AppDir Label [Id]
     Tuple [Id]
-  | LetTuple [Id] Id Expr
+  | LetTuple [Id] Id Exp
   | Get Id Id
   | Put Id Id Id
   -- \| ExtArray Label
@@ -42,18 +42,18 @@ data FunDef = FunDef
   { name :: Label
   , args :: [Id]
   , formalFv :: [Id]
-  , rhs :: Expr
+  , rhs :: Exp
   }
   deriving stock (Eq, Show)
 
-data Program = Program [FunDef] Expr
+data Program = Program [FunDef] Exp
   deriving stock (Eq, Show)
 
 -- TODO: Direct App
-closureConvert :: K.KNormal -> Program
+closureConvert :: K.Exp -> Program
 closureConvert = uncurry (flip Program) . runWriter . go
   where
-    go :: K.KNormal -> Writer [FunDef] Expr
+    go :: K.Exp -> Writer [FunDef] Exp
     go = \case
       K.Unit -> pure Unit
       K.Int int -> pure $ Int int
