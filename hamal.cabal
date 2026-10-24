@@ -47,6 +47,7 @@ library
   -- cabal-gild: discover src
   exposed-modules:
     Backend.Riscv.Asm
+    Backend.Riscv.RegAlloc
     Backend.Riscv.Virtual
     Frontend.Lexer
     Frontend.Parser

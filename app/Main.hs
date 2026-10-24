@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Backend.Riscv.RegAlloc (regAlloc)
 import Backend.Riscv.Virtual (genVirtual)
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Frontend.Lexer (runAlex)
@@ -24,6 +25,7 @@ main = do
       let assoc = assocLet <$> beta
       let closured = closureConvert <$> assoc
       let virtual = genVirtual =<< closured
+      let regalloc = regAlloc <$> virtual
       putStrLn "---------- syntax ----------"
       dump syntax
       putStrLn "---------- knorm ----------"
@@ -38,6 +40,8 @@ main = do
       dump . runFresh $ closured
       putStrLn "---------- virtual ----------"
       dump . runFresh $ virtual
+      putStrLn "---------- regAlloc ----------"
+      dump . runFresh $ regalloc
   where
     dump :: (Show a) => a -> IO ()
     dump = P.pPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True}

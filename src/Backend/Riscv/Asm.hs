@@ -1,6 +1,6 @@
 module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
 
-import Id (Label)
+import Id (Id, Label)
 
 data Block r
   = Ans (Inst r)
@@ -22,6 +22,8 @@ data Inst r
   | IfEq r r (Block r) (Block r)
   | IfLe r r (Block r) (Block r)
   | CallDir Label [r]
+  | Save r Id
+  | Restore Id
   deriving stock (Show, Eq)
 
 data FunDef r = FunDef
@@ -35,38 +37,38 @@ data Program r = Program [FunDef r] (Block r)
   deriving stock (Show, Eq)
 
 data Reg
-  = X0
-  | X1
-  | X2
-  | X3
-  | X4
-  | X5
-  | X6
-  | X7
-  | X8
-  | X9
-  | X10
-  | X11
-  | X12
-  | X13
-  | X14
-  | X15
-  | X16
-  | X17
-  | X18
-  | X19
-  | X20
-  | X21
-  | X22
-  | X23
-  | X24
-  | X25
-  | X26
-  | X27
-  | X28
-  | X29
-  | X30
-  | X31
+  = Zero
+  | Ra
+  | Sp
+  | Gp
+  | Tp
+  | T0
+  | T1
+  | T2
+  | S0
+  | S1
+  | A0
+  | A1
+  | A2
+  | A3
+  | A4
+  | A5
+  | A6
+  | A7
+  | S2
+  | S3
+  | S4
+  | S5
+  | S6
+  | S7
+  | S8
+  | S9
+  | S10
+  | S11
+  | T3
+  | T4
+  | T5
+  | T6
   deriving stock (Eq, Enum)
 
 instance Show Reg where
