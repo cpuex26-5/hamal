@@ -1,6 +1,7 @@
-module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..), buildReg) where
+module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
 
-import Data.ByteString.Builder qualified as BB
+import Buildable (Buildable (..))
+import Data.ByteString.Builder (intDec)
 import Id (Id, Label)
 
 data Block r
@@ -70,10 +71,7 @@ data Reg
   | T4
   | T5
   | T6
-  deriving stock (Eq, Enum)
+  deriving stock (Show, Eq, Enum)
 
-instance Show Reg where
-  show = ("x" <>) . show . fromEnum
-
-buildReg :: Reg -> BB.Builder
-buildReg = ("x" <>) . BB.intDec . fromEnum
+instance Buildable Reg where
+  build = ("x" <>) . intDec . fromEnum

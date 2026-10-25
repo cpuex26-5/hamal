@@ -1,7 +1,8 @@
-module Id (Id, Label, Fresh, mkName, toLabel, buildName, fresh, refresh, runFresh) where
+module Id (Id, Label, Fresh, mkName, toLabel, fresh, refresh, runFresh) where
 
+import Buildable (Buildable (..))
 import Control.Monad.Trans.State (State, evalState, get, modify)
-import Data.ByteString.Builder (Builder, shortByteString)
+import Data.ByteString.Builder (intDec, shortByteString)
 import Data.ByteString.Short (ShortByteString)
 
 data NameSort = Local | Global
@@ -13,6 +14,9 @@ data Name (s :: NameSort)
 instance Show (Name s) where
   show Name {hint, unique} = show hint <> "." <> show unique
 
+instance Buildable (Name s) where
+  build Name {hint, unique} = shortByteString hint <> "." <> intDec unique
+
 type Id = Name Local
 
 type Label = Name Global
@@ -22,10 +26,6 @@ mkName hint = Name {hint, unique = 0}
 
 toLabel :: Id -> Label
 toLabel (Name {..}) = Name {..}
-
--- TODO: type-classify
-buildName :: Name s -> Builder
-buildName name = shortByteString name.hint
 
 type Fresh = State Int
 

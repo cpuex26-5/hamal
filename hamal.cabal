@@ -50,6 +50,7 @@ library
     Backend.Riscv.Emit
     Backend.Riscv.RegAlloc
     Backend.Riscv.Virtual
+    Buildable
     Frontend.Lexer
     Frontend.Parser
     Frontend.SrcSpan
