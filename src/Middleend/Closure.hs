@@ -2,7 +2,7 @@ module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), clo
 
 import Control.Monad.Trans.Writer (Writer, runWriter, tell)
 import Data.Set qualified as S
-import Id (Id, Label, constantify)
+import Id (Id, Label, toLabel)
 import Middleend.KNormal (FunBind (FunBind))
 import Middleend.KNormal qualified as K
 
@@ -73,9 +73,9 @@ closureConvert = uncurry (flip Program) . runWriter . go
         rhs' <- go rhs
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
         body' <- go body
-        tell [FunDef {name = constantify name, args, formalFv = fv, rhs = rhs'}]
+        tell [FunDef {name = toLabel name, args, formalFv = fv, rhs = rhs'}]
         pure body'
-      K.App fun params -> pure $ AppDir (constantify fun) params
+      K.App fun params -> pure $ AppDir (toLabel fun) params
       K.Tuple idents -> pure $ Tuple idents
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> go body
       K.Get arr idx -> pure $ Get arr idx

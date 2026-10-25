@@ -1,8 +1,11 @@
 module Frontend.Token (Token (..), symbol, literal, identOf, intOf, floatOf, boolOf) where
 
 import Control.Monad (guard)
+import Data.ByteString (toStrict)
 import Data.ByteString.Lazy.Char8 qualified as BS
+import Data.ByteString.Short (toShort)
 import Frontend.SrcSpan (Located (..), SrcSpan)
+import Id (Id, mkName)
 import Prelude hiding (span)
 
 data Token
@@ -45,8 +48,8 @@ symbol token Located {value, span} = span <$ guard (value == token)
 literal :: (Token -> Maybe a) -> Located Token -> Maybe (Located a)
 literal = traverse
 
-identOf :: Token -> Maybe BS.ByteString
-identOf (TIdent ident) = Just ident
+identOf :: Token -> Maybe Id
+identOf (TIdent ident) = Just . mkName . toShort . toStrict $ ident
 identOf _ = Nothing
 
 intOf :: Token -> Maybe Int

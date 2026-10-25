@@ -1,35 +1,42 @@
-module Id (Id (..), Label (..), Fresh, constantify, buildId, buildLabel, refresh, freshTmpId, runFresh) where
+module Id (Id, Label, Fresh, mkName, toLabel, buildName, fresh, refresh, runFresh) where
 
 import Control.Monad.Trans.State (State, evalState, get, modify)
-import Data.ByteString.Builder (intDec, lazyByteString, toLazyByteString)
-import Data.ByteString.Builder qualified as BB
-import Data.ByteString.Lazy.Char8 qualified as BS
+import Data.ByteString.Builder (Builder, shortByteString)
+import Data.ByteString.Short (ShortByteString)
 
-newtype Id = Id BS.ByteString
-  deriving newtype (Eq, Ord, Show)
+data NameSort = Local | Global
 
-newtype Label = Label BS.ByteString
-  deriving newtype (Eq, Ord, Show)
+data Name (s :: NameSort)
+  = Name {hint :: ShortByteString, unique :: Int}
+  deriving stock (Eq, Ord)
 
-constantify :: Id -> Label
-constantify (Id ident) = Label ident
+instance Show (Name s) where
+  show Name {hint, unique} = show hint <> "." <> show unique
 
-buildId :: Id -> BB.Builder
-buildId (Id ident) = lazyByteString ident
+type Id = Name Local
 
-buildLabel :: Label -> BB.Builder
-buildLabel (Label label) = lazyByteString label
+type Label = Name Global
+
+mkName :: ShortByteString -> Name s
+mkName hint = Name {hint, unique = 0}
+
+toLabel :: Id -> Label
+toLabel (Name {..}) = Name {..}
+
+-- TODO: type-classify
+buildName :: Name s -> Builder
+buildName name = shortByteString name.hint
 
 type Fresh = State Int
 
 runFresh :: Fresh a -> a
 runFresh m = evalState m 0
 
-refresh :: Id -> Fresh Id
-refresh ident = do
+fresh :: ShortByteString -> Fresh (Name s)
+fresh hint = pure (Name {hint, unique = 0})
+
+refresh :: Name s -> Fresh (Name s)
+refresh name = do
   counter <- get
   modify (+ 1)
-  pure . Id . toLazyByteString $ buildId ident <> "." <> intDec counter
-
-freshTmpId :: Fresh Id
-freshTmpId = refresh (Id "T")
+  pure $ name {unique = counter}
