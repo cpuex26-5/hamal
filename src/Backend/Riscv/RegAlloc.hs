@@ -9,13 +9,14 @@ regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock bl
   where
     binding = zip (enumFrom A0) -- TODO: assertion
     restoring = foldr (\(reg, ident) -> Let reg (Restore ident))
+    storing = foldr (\(reg, ident) -> Let Zero (Save reg ident))
 
     allocFun :: FunDef Id -> FunDef Reg
     allocFun FunDef {name, args, rhs} =
       FunDef
         { name
         , args = fst <$> binding args
-        , rhs = restoring (allocBlock rhs) (binding args)
+        , rhs = storing (allocBlock rhs) (binding args)
         }
 
     allocInst :: Inst Id -> (Inst Reg, [Id])
@@ -39,8 +40,8 @@ regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock bl
 
     allocBlock :: Block Id -> Block Reg
     allocBlock = \case
-      Ans inst -> withRestore Ans inst
-      Let binder inst@CallDir {} body -> withRestore (\i -> Let A0 i (Let Zero (Save A0 binder) (allocBlock body))) inst
-      Let binder inst body -> withRestore (\i -> Let T0 i (Let Zero (Save T0 binder) (allocBlock body))) inst
+      Ans inst -> withRestore T0 Ans inst
+      Let binder inst@CallDir {} body -> withRestore A0 (\i -> Let A0 i (Let Zero (Save A0 binder) (allocBlock body))) inst
+      Let binder inst body -> withRestore T0 (\i -> Let T0 i (Let Zero (Save T0 binder) (allocBlock body))) inst
       where
-        withRestore toBlock = uncurry restoring . bimap toBlock binding . allocInst
+        withRestore startReg toBlock = uncurry restoring . bimap toBlock (zip (enumFrom startReg)) . allocInst

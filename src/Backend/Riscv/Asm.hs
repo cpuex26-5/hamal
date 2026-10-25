@@ -1,5 +1,6 @@
-module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
+module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..), buildReg) where
 
+import Data.ByteString.Builder qualified as BB
 import Id (Id, Label)
 
 data Block r
@@ -72,4 +73,7 @@ data Reg
   deriving stock (Eq, Enum)
 
 instance Show Reg where
-  show r = "x" <> show (fromEnum r)
+  show = ("x" <>) . show . fromEnum
+
+buildReg :: Reg -> BB.Builder
+buildReg = ("x" <>) . BB.intDec . fromEnum
