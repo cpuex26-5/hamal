@@ -26,7 +26,7 @@ betaConvert expr = evalState (go expr) M.empty
         IfLe lhs rhs thn els -> (IfLe `on` resolve) lhs rhs <$> go thn <*> go els
         Let binder rhs body -> case rhs of
           -- TODO: report beta-reduction
-          Var bound -> modify (M.insert bound binder) >> go body
+          Var bound -> modify (M.insert binder bound) >> go body
           _ -> Let binder rhs <$> go body
         Var ident -> pure . Var . resolve $ ident
         LetRec FunBind {name, args, rhs} body ->
