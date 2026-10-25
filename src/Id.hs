@@ -1,9 +1,10 @@
 module Id (Id, Label, Fresh, mkName, toLabel, fresh, refresh, runFresh) where
 
 import Buildable (Buildable (..))
-import Control.Monad.Trans.State (State, evalState, get, modify)
 import Data.ByteString.Builder (intDec, shortByteString)
 import Data.ByteString.Short (ShortByteString)
+import Effectful (Dispatch (..), DispatchOf, Eff, Effect, (:>))
+import Effectful.Dispatch.Static (SideEffects (..), StaticRep, evalStaticRep, stateStaticRep)
 
 data NameSort = Local | Global
 
@@ -27,16 +28,17 @@ mkName hint = Name {hint, unique = 0}
 toLabel :: Id -> Label
 toLabel (Name {..}) = Name {..}
 
-type Fresh = State Int
+data Fresh :: Effect
 
-runFresh :: Fresh a -> a
-runFresh m = evalState m 0
+type instance DispatchOf Fresh = Static NoSideEffects
 
-fresh :: ShortByteString -> Fresh (Name s)
-fresh hint = pure (Name {hint, unique = 0})
+newtype instance StaticRep Fresh = Counter Int
 
-refresh :: Name s -> Fresh (Name s)
-refresh name = do
-  counter <- get
-  modify (+ 1)
-  pure $ name {unique = counter}
+runFresh :: Eff (Fresh : es) a -> Eff es a
+runFresh = evalStaticRep (Counter 1)
+
+refresh :: (Fresh :> es) => Name s -> Eff es (Name s)
+refresh name = stateStaticRep \(Counter !n) -> (name {unique = n}, Counter (n + 1))
+
+fresh :: (Fresh :> es) => ShortByteString -> Eff es (Name s)
+fresh = refresh . mkName

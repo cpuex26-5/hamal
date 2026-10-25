@@ -4,13 +4,15 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), asks, local)
 import Data.Function (on)
 import Data.Map qualified as M
+import Effectful ((:>))
+import Effectful.Internal.Monad (Eff)
 import Id (Fresh, Id, refresh)
 import Middleend.KNormal (Exp (..), FunBind (..))
 
-alphaConvert :: Exp -> Fresh Exp
+alphaConvert :: (Fresh :> es) => Exp -> Eff es Exp
 alphaConvert = flip runReaderT M.empty . go
   where
-    go :: Exp -> ReaderT (M.Map Id Id) Fresh Exp
+    go :: (Fresh :> es) => Exp -> ReaderT (M.Map Id Id) (Eff es) Exp
     go expr = do
       resolve <- asks (\m ident -> M.findWithDefault ident ident m)
       case expr of

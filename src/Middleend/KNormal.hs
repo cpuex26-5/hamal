@@ -1,6 +1,8 @@
 module Middleend.KNormal (Exp (..), FunBind (..), kNormal) where
 
 import Data.Bool (bool)
+import Effectful ((:>))
+import Effectful.Internal.Monad (Eff)
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
 import Id (Fresh, Id, fresh, mkName)
@@ -38,7 +40,7 @@ data FunBind = FunBind
   }
   deriving stock (Show, Eq)
 
-insertLet :: Fresh Exp -> (Id -> Fresh Exp) -> Fresh Exp
+insertLet :: (Fresh :> es) => Eff es Exp -> (Id -> Eff es Exp) -> Eff es Exp
 insertLet scrutM k = do
   scrut <- scrutM
   case scrut of
@@ -48,7 +50,7 @@ insertLet scrutM k = do
       body <- k tmp
       pure $ Let tmp scrut body
 
-kNormal :: Syntax a -> Fresh Exp
+kNormal :: (Fresh :> es) => Syntax a -> Eff es Exp
 kNormal Syntax {ann, kind} = case kind of
   S.Unit -> pure Unit
   S.Int int -> pure $ Int int

@@ -7,11 +7,12 @@ import Control.Monad.Trans.Reader (ReaderT (runReaderT), asks, local, runReaderT
 import Control.Monad.Trans.Writer (WriterT, execWriterT, mapWriterT, tell)
 import Data.ByteString.Builder qualified as BB
 import Data.Map qualified as M
+import Effectful (Eff, (:>))
 import Id (Fresh, Id, fresh, mkName, toLabel)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
-type Emit = WriterT BB.Builder (ReaderT Frame Fresh)
+type Emit es = WriterT BB.Builder (ReaderT Frame (Eff es))
 
 data Dest = Tail | NonTail Reg
 
@@ -32,7 +33,7 @@ mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
       IfLe _ _ thn els -> saveB thn <> saveB els
       Save _ ident -> [ident]
 
-emitNonTail :: Reg -> Inst Reg -> Emit ()
+emitNonTail :: (Fresh :> es) => Reg -> Inst Reg -> Emit es ()
 emitNonTail rd = \case
   Nop -> pure ()
   Li imm -> tell $ "\tli\t" <> build rd <> ", " <> BB.intDec imm <> "\n"
@@ -73,7 +74,7 @@ emitNonTail rd = \case
     offset <- lift (asks \frame -> frame.slots M.! ident)
     tell $ "\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
 
-emitBlock :: Dest -> Block Reg -> Emit ()
+emitBlock :: (Fresh :> es) => Dest -> Block Reg -> Emit es ()
 emitBlock dest = \case
   Ans inst -> case dest of
     Tail -> do
@@ -85,7 +86,7 @@ emitBlock dest = \case
     NonTail reg -> emitNonTail reg inst
   Let reg inst body -> emitNonTail reg inst *> emitBlock dest body
 
-emitFun :: FunDef Reg -> Emit ()
+emitFun :: (Fresh :> es) => FunDef Reg -> Emit es ()
 emitFun FunDef {name, rhs} = do
   let frame = mkFrame rhs
   tell $ build name <> ":\n"
@@ -93,7 +94,7 @@ emitFun FunDef {name, rhs} = do
   tell $ "\tsw\t" <> build Ra <> ", " <> BB.intDec (frame.size - 4) <> "(" <> build Sp <> ")\n"
   mapWriterT (local (const frame)) $ emitBlock Tail rhs
 
-emit :: Program Reg -> Fresh BB.Builder
+emit :: (Fresh :> es) => Program Reg -> Eff es BB.Builder
 emit (Program fundefs block) = flip runReaderT emptyFrame $ execWriterT do
   tell ".section\t.text\n"
   mapM_ emitFun fundefs
