@@ -1,4 +1,4 @@
-module Hamal (Dump (..), Phase (..), Stage (..), phase, compile, CompileError (..)) where
+module Hamal (Dump (..), Phase (..), Stage (..), phase, compile, CompileError (..), phaseName) where
 
 import Backend.Riscv.Asm (Reg)
 import Backend.Riscv.Asm qualified as V
@@ -32,6 +32,7 @@ data Phase
   | Closure
   | Virtual
   | RegAlloc
+  deriving stock (Show, Eq, Ord, Enum, Bounded)
 
 data Stage a where
   SParsed :: Stage (Syntax SrcSpan)
@@ -53,6 +54,17 @@ phase = \case
   SClosure -> Closure
   SVirtual -> Virtual
   SRegAlloc -> RegAlloc
+
+phaseName :: Phase -> String
+phaseName = \case
+  Parsed -> "parsed"
+  KNormal -> "knorm"
+  Alpha -> "alpha"
+  Beta -> "beta"
+  Assoc -> "assoc"
+  Closure -> "closure"
+  Virtual -> "virtual"
+  RegAlloc -> "regalloc"
 
 data Dump :: Effect where
   Dump :: (Show a) => Stage a -> a -> Dump m ()
