@@ -57,6 +57,7 @@ library
     Frontend.SrcSpan
     Frontend.Syntax
     Frontend.Token
+    Hamal
     Id
     Middleend.Closure
     Middleend.KNormal
@@ -81,9 +82,9 @@ executable hamal
   main-is: Main.hs
   build-depends:
     bytestring,
+    effectful-core,
     hamal,
     pretty-simple,
-    effectful-core,
 
   hs-source-dirs: app
 
