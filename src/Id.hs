@@ -38,7 +38,7 @@ runFresh :: Eff (Fresh : es) a -> Eff es a
 runFresh = evalStaticRep (Counter 1)
 
 refresh :: (Fresh :> es) => Name s -> Eff es (Name s)
-refresh name = stateStaticRep \(Counter !n) -> (name {unique = n}, Counter (n + 1))
+refresh name = stateStaticRep \(Counter n) -> (name {unique = n}, Counter (n + 1))
 
 fresh :: (Fresh :> es) => ShortByteString -> Eff es (Name s)
 fresh = refresh . mkName

@@ -2,17 +2,14 @@ module Backend.Riscv.Emit (emit) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
 import Buildable (Buildable (build))
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Reader (ReaderT (runReaderT), asks, local, runReaderT)
-import Control.Monad.Trans.Writer (WriterT, execWriterT, mapWriterT, tell)
 import Data.ByteString.Builder qualified as BB
 import Data.Map qualified as M
 import Effectful (Eff, (:>))
+import Effectful.Reader.Static (Reader, asks, runReader)
+import Effectful.Writer.Static.Local (Writer, execWriter, tell)
 import Id (Fresh, Id, fresh, mkName, toLabel)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
-
-type Emit es = WriterT BB.Builder (ReaderT Frame (Eff es))
 
 data Dest = Tail | NonTail Reg
 
@@ -22,18 +19,16 @@ mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
     slots = M.fromList $ zip (saveB block) [0, 4 ..]
     align n = ((n + 15) `div` 16) * 16
 
-    saveB :: Block r -> [Id]
     saveB = \case
       Ans inst -> saveI inst
       Let _ rhs body -> saveI rhs <> saveB body
-    saveI :: Inst r -> [Id]
     saveI = \case
       Nop; Li {}; La {}; Mv {}; Add {}; Addi {}; Neg {}; Sub {}; Lw {}; Lwl {}; Sw {}; CallDir {}; Restore {} -> []
       IfEq _ _ thn els -> saveB thn <> saveB els
       IfLe _ _ thn els -> saveB thn <> saveB els
       Save _ ident -> [ident]
 
-emitNonTail :: (Fresh :> es) => Reg -> Inst Reg -> Emit es ()
+emitNonTail :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Reg -> Inst Reg -> Eff es ()
 emitNonTail rd = \case
   Nop -> pure ()
   Li imm -> tell $ "\tli\t" <> build rd <> ", " <> BB.intDec imm <> "\n"
@@ -49,8 +44,8 @@ emitNonTail rd = \case
       *> tell ("\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build T0 <> ")\n")
   Sw rd' rs offset -> tell $ "\tsw\t" <> build rd' <> ", " <> BB.intDec offset <> "(" <> build rs <> ")\n"
   IfEq lhs rhs thn els -> do
-    label_else <- fmap toLabel <$> lift . lift $ fresh "else"
-    label_cont <- fmap toLabel <$> lift . lift $ fresh "cont"
+    label_else <- toLabel <$> fresh "else"
+    label_cont <- toLabel <$> fresh "cont"
     tell $ "\tbne\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
     emitBlock (NonTail rd) thn
     tell $ "\tj\t" <> build label_cont <> "\n"
@@ -58,8 +53,8 @@ emitNonTail rd = \case
     emitBlock (NonTail rd) els
     tell $ build label_cont <> ":\n"
   IfLe lhs rhs thn els -> do
-    label_else <- fmap toLabel <$> lift . lift $ fresh "else"
-    label_cont <- fmap toLabel <$> lift . lift $ fresh "cont"
+    label_else <- toLabel <$> fresh "else"
+    label_cont <- toLabel <$> fresh "cont"
     tell $ "\tbgt\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
     emitBlock (NonTail rd) thn
     tell $ "\tj\t" <> build label_cont <> "\n"
@@ -68,37 +63,35 @@ emitNonTail rd = \case
     tell $ build label_cont <> ":\n"
   CallDir fun _ -> tell $ "\tcall\t" <> build fun <> "\n"
   Save rs ident -> do
-    offset <- lift (asks \frame -> frame.slots M.! ident)
+    offset <- asks @Frame \frame -> frame.slots M.! ident
     tell $ "\tsw\t" <> build rs <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
   Restore ident -> do
-    offset <- lift (asks \frame -> frame.slots M.! ident)
+    offset <- asks @Frame \frame -> frame.slots M.! ident
     tell $ "\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
 
-emitBlock :: (Fresh :> es) => Dest -> Block Reg -> Emit es ()
+emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest -> Block Reg -> Eff es ()
 emitBlock dest = \case
   Ans inst -> case dest of
     Tail -> do
       emitNonTail A0 inst
-      size <- lift $ asks (.size)
+      size <- asks @Frame (.size)
       tell $ "\tlw\t" <> build Ra <> ", " <> BB.intDec (size - 4) <> "(" <> build Sp <> ")\n"
       tell $ "\taddi\t" <> build Sp <> ", " <> build Sp <> ", " <> BB.intDec size <> "\n"
-      tell "\tret\n"
+      tell @BB.Builder "\tret\n"
     NonTail reg -> emitNonTail reg inst
   Let reg inst body -> emitNonTail reg inst *> emitBlock dest body
 
-emitFun :: (Fresh :> es) => FunDef Reg -> Emit es ()
+emitFun :: (Fresh :> es, Writer BB.Builder :> es) => FunDef Reg -> Eff es ()
 emitFun FunDef {name, rhs} = do
   let frame = mkFrame rhs
   tell $ build name <> ":\n"
   tell $ "\taddi\t" <> build Sp <> ", " <> build Sp <> ", -" <> BB.intDec frame.size <> "\n"
   tell $ "\tsw\t" <> build Ra <> ", " <> BB.intDec (frame.size - 4) <> "(" <> build Sp <> ")\n"
-  mapWriterT (local (const frame)) $ emitBlock Tail rhs
+  runReader frame $ emitBlock Tail rhs
 
 emit :: (Fresh :> es) => Program Reg -> Eff es BB.Builder
-emit (Program fundefs block) = flip runReaderT emptyFrame $ execWriterT do
-  tell ".section\t.text\n"
+emit (Program fundefs block) = execWriter do
+  tell @BB.Builder ".section\t.text\n"
   mapM_ emitFun fundefs
-  tell ".global\tmin_caml_start\n"
+  tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun (FunDef (mkName "min_caml_start") [] block)
-  where
-    emptyFrame = Frame {slots = M.empty, size = 0}

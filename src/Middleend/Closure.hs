@@ -1,7 +1,8 @@
 module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
 
-import Control.Monad.Trans.Writer (Writer, runWriter, tell)
 import Data.Set qualified as S
+import Effectful (Eff, runPureEff, (:>))
+import Effectful.Output.Static.Local.List (Output, output, runOutput)
 import Id (Id, Label, toLabel)
 import Middleend.KNormal (FunBind (FunBind))
 import Middleend.KNormal qualified as K
@@ -50,9 +51,9 @@ data Program = Program [FunDef] Exp
   deriving stock (Eq, Show)
 
 closureConvert :: K.Exp -> Program
-closureConvert = uncurry (flip Program) . runWriter . go
+closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
   where
-    go :: K.Exp -> Writer [FunDef] Exp
+    go :: (Output FunDef :> es) => K.Exp -> Eff es Exp
     go = \case
       K.Unit -> pure Unit
       K.Int int -> pure $ Int int
@@ -73,7 +74,7 @@ closureConvert = uncurry (flip Program) . runWriter . go
         rhs' <- go rhs
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
         body' <- go body
-        tell [FunDef {name = toLabel name, args, formalFv = fv, rhs = rhs'}]
+        output $ FunDef {name = toLabel name, args, formalFv = fv, rhs = rhs'}
         pure body'
       K.App fun params -> pure $ AppDir (toLabel fun) params
       K.Tuple idents -> pure $ Tuple idents

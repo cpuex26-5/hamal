@@ -73,7 +73,6 @@ library
     bytestring,
     containers,
     effectful-core,
-    transformers,
 
   hs-source-dirs: src
 
