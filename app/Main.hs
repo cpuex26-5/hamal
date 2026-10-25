@@ -23,7 +23,7 @@ main = do
     Left err -> putStrLn err
     Right syntax -> do
       let knorm = kNormal syntax
-      let alpha = alphaConvert knorm
+      let alpha = alphaConvert =<< knorm
       let beta = betaConvert <$> alpha
       let assoc = assocLet <$> beta
       let closured = closureConvert <$> assoc

@@ -7,10 +7,8 @@ import Data.Map qualified as M
 import Id (Fresh, Id, refresh)
 import Middleend.KNormal (Exp (..), FunBind (..))
 
-alphaConvert :: Fresh Exp -> Fresh Exp
-alphaConvert exprM = do
-  expr' <- exprM
-  runReaderT (go expr') M.empty
+alphaConvert :: Exp -> Fresh Exp
+alphaConvert = flip runReaderT M.empty . go
   where
     go :: Exp -> ReaderT (M.Map Id Id) Fresh Exp
     go expr = do
