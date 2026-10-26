@@ -4,8 +4,7 @@ import Middleend.KNormal (Exp (..), FunBind (..))
 
 assocLet :: Exp -> Exp
 assocLet = \case
-  IfEq lhs rhs thn els -> IfEq lhs rhs (assocLet thn) (assocLet els)
-  IfLe lhs rhs thn els -> IfLe lhs rhs (assocLet thn) (assocLet els)
+  If cmp lhs rhs thn els -> If cmp lhs rhs (assocLet thn) (assocLet els)
   Let binder rhs body -> go (\final -> Let binder final $ assocLet body) rhs
   LetRec FunBind {..} body -> LetRec FunBind {name, args, rhs = assocLet rhs} $ assocLet body
   LetTuple binders rhs body -> LetTuple binders rhs $ assocLet body

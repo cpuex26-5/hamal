@@ -64,6 +64,7 @@ library
     Middleend.Opt.Assoc
     Middleend.Opt.Beta
     Name
+    PrimOp
 
   build-tool-depends:
     alex:alex,
@@ -73,6 +74,7 @@ library
     array,
     bytestring,
     containers,
+    transformers,
     effectful-core,
 
   hs-source-dirs: src

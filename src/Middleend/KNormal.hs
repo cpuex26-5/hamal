@@ -1,34 +1,25 @@
 module Middleend.KNormal (Exp (..), FunBind (..), kNormal) where
 
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Cont (ContT (..), evalContT)
 import Data.Bool (bool)
-import Effectful ((:>))
-import Effectful.Internal.Monad (Eff)
+import Effectful (Eff, (:>))
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
 import Name (Fresh, Id, external, internal, refresh)
+import PrimOp (Cmp (..), PrimOp (..))
 
 data Exp
   = Unit
   | Int Int
   | Float Float
-  | Neg Id
-  | Add Id Id
-  | Sub Id Id
-  | FNeg Id
-  | FAdd Id Id
-  | FSub Id Id
-  | FMul Id Id
-  | FDiv Id Id
-  | IfEq Id Id Exp Exp
-  | IfLe Id Id Exp Exp
-  | Let Id Exp Exp
   | Var Id
+  | PrimOp (PrimOp Id)
+  | If Cmp Id Id Exp Exp
+  | Let Id Exp Exp
   | LetRec FunBind Exp
-  | App Id [Id]
-  | Tuple [Id]
   | LetTuple [Id] Id Exp
-  | Get Id Id
-  | Put Id Id Id
+  | App Id [Id]
   -- \| ExtArray Id
   -- \| ExtFunApp Id [Id]
   deriving stock (Show, Eq)
@@ -51,67 +42,29 @@ insertLet scrutM k = do
       pure $ Let tmp scrut body
 
 kNormal :: (Fresh :> es) => Syntax a -> Eff es Exp
-kNormal Syntax {ann, kind} = case kind of
+kNormal s = evalContT $ case s.kind of
   S.Unit -> pure Unit
   S.Int int -> pure $ Int int
   S.Float float -> pure $ Float float
   S.Bool bol -> pure . Int $ bool 0 1 bol
-  S.Not e -> kNormal $ Syntax ann $ S.If e (Syntax ann (S.Bool False)) (Syntax ann (S.Bool True))
-  S.Neg e -> insertLet (kNormal e) (pure . Neg)
-  S.FNeg e -> insertLet (kNormal e) (pure . FNeg)
-  S.Add lhs rhs -> insertLet (kNormal lhs) \l -> insertLet (kNormal rhs) (pure . Add l)
-  S.Sub lhs rhs -> insertLet (kNormal lhs) \l -> insertLet (kNormal rhs) (pure . Sub l)
-  S.FAdd lhs rhs -> insertLet (kNormal lhs) \l -> insertLet (kNormal rhs) (pure . FAdd l)
-  S.FSub lhs rhs -> insertLet (kNormal lhs) \l -> insertLet (kNormal rhs) (pure . FSub l)
-  S.FMul lhs rhs -> insertLet (kNormal lhs) \l -> insertLet (kNormal rhs) (pure . FMul l)
-  S.FDiv lhs rhs -> insertLet (kNormal lhs) \l -> insertLet (kNormal rhs) (pure . FDiv l)
-  (S.Eq _ _; S.Le _ _) ->
-    kNormal . Syntax ann $
-      S.If Syntax {ann, kind} (Syntax ann (S.Bool True)) (Syntax ann (S.Bool False))
-  S.If Syntax {kind = S.Eq lhs rhs} thn els ->
-    insertLet (kNormal lhs) \l ->
-      insertLet (kNormal rhs) \r -> do
-        thn' <- kNormal thn
-        els' <- kNormal els
-        pure $ IfEq l r thn' els'
-  S.If Syntax {kind = S.Le lhs rhs} thn els ->
-    insertLet (kNormal lhs) \l ->
-      insertLet (kNormal rhs) \r -> do
-        thn' <- kNormal thn
-        els' <- kNormal els
-        pure $ IfLe l r thn' els'
-  S.If cnd thn els ->
-    kNormal . Syntax ann $
-      S.If (Syntax cnd.ann $ S.Eq cnd (Syntax ann (S.Bool True))) thn els
-  S.Let binder rhs body -> do
-    rhs' <- kNormal rhs
-    body' <- kNormal body
-    pure $ Let binder rhs' body'
+  (S.Not {}; S.Cmp {}) -> kIf s (pure (Int 1)) (pure (Int 0))
   S.Var name -> pure $ Var name
+  S.PrimOp op -> PrimOp <$> traverse atomize op
+  S.If cnd thn els -> kIf cnd (kNormal thn) (kNormal els)
+  S.Let binder rhs body -> Let binder <$> lift (kNormal rhs) <*> lift (kNormal body)
   S.LetRec S.FunBind {name, args, rhs} body -> do
-    rhs' <- kNormal rhs
-    body' <- kNormal body
+    rhs' <- lift $ kNormal rhs
+    body' <- lift $ kNormal body
     pure $ LetRec (FunBind {name, args, rhs = rhs'}) body'
   -- TODO: external functions
-  S.App fun params ->
-    insertLet (kNormal fun) \fun' ->
-      bind params (App fun') []
-  S.Tuple exprs -> bind exprs Tuple []
-  S.LetTuple binders rhs body -> insertLet (kNormal rhs) \rhs' -> do
-    body' <- kNormal body
-    pure $ LetTuple binders rhs' body'
+  S.App fun params -> App <$> atomize fun <*> traverse atomize params
+  S.LetTuple binders rhs body -> LetTuple binders <$> atomize rhs <*> lift (kNormal body)
   -- TODO: create_float_array
-  S.Array len initial -> insertLet (kNormal len) \len' ->
-    insertLet (kNormal initial) \initial' ->
-      pure $ App (external "create_array") [len', initial']
-  S.Get arr idx -> insertLet (kNormal arr) \lhs' ->
-    insertLet (kNormal idx) (pure . Get lhs')
-  S.Put arr idx rhs -> insertLet (kNormal arr) \lhs' ->
-    insertLet (kNormal idx) \idx' ->
-      insertLet (kNormal rhs) (pure . Put lhs' idx')
+  S.Array len initial -> App (external "create_array") <$> traverse atomize [len, initial]
   where
-    bind exprs constr =
-      foldl'
-        (\k m args -> insertLet m $ \arg -> k $ args <> [arg])
-        (pure . constr)
-        (kNormal <$> exprs)
+    atom = ContT . insertLet
+    atomize = atom . kNormal
+    kIf cnd thn els = case cnd.kind of
+      S.Not c -> kIf c els thn
+      S.Cmp cmp lhs rhs -> If cmp <$> atomize lhs <*> atomize rhs <*> lift thn <*> lift els
+      _ -> If Eq <$> atomize cnd <*> atom (pure (Int 1)) <*> lift thn <*> lift els

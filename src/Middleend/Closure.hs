@@ -6,6 +6,7 @@ import Effectful.Output.Static.Local.List (Output, output, runOutput)
 import Middleend.KNormal (FunBind (FunBind))
 import Middleend.KNormal qualified as K
 import Name (Id, Label, toLabel)
+import PrimOp qualified as P
 
 data Closure = Closure
   { entry :: Label
@@ -58,29 +59,29 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
       K.Unit -> pure Unit
       K.Int int -> pure $ Int int
       K.Float float -> pure $ Float float
-      K.Neg ident -> pure $ Neg ident
-      K.Add lhs rhs -> pure $ Add lhs rhs
-      K.Sub lhs rhs -> pure $ Sub lhs rhs
-      K.FNeg ident -> pure $ FNeg ident
-      K.FAdd lhs rhs -> pure $ FAdd lhs rhs
-      K.FSub lhs rhs -> pure $ FSub lhs rhs
-      K.FMul lhs rhs -> pure $ FMul lhs rhs
-      K.FDiv lhs rhs -> pure $ FDiv lhs rhs
-      K.IfEq lhs rhs thn els -> IfEq lhs rhs <$> go thn <*> go els
-      K.IfLe lhs rhs thn els -> IfLe lhs rhs <$> go thn <*> go els
-      K.Let binder rhs body -> Let binder <$> go rhs <*> go body
       K.Var ident -> pure $ Var ident
+      K.PrimOp (P.Neg ident) -> pure $ Neg ident
+      K.PrimOp (P.Add lhs rhs) -> pure $ Add lhs rhs
+      K.PrimOp (P.Sub lhs rhs) -> pure $ Sub lhs rhs
+      K.PrimOp (P.FNeg ident) -> pure $ FNeg ident
+      K.PrimOp (P.FAdd lhs rhs) -> pure $ FAdd lhs rhs
+      K.PrimOp (P.FSub lhs rhs) -> pure $ FSub lhs rhs
+      K.PrimOp (P.FMul lhs rhs) -> pure $ FMul lhs rhs
+      K.PrimOp (P.FDiv lhs rhs) -> pure $ FDiv lhs rhs
+      K.PrimOp (P.Tuple idents) -> pure $ Tuple idents
+      K.PrimOp (P.Get arr idx) -> pure $ Get arr idx
+      K.PrimOp (P.Put arr idx rhs) -> pure $ Put arr idx rhs
+      K.If P.Eq lhs rhs thn els -> IfEq lhs rhs <$> go thn <*> go els
+      K.If P.Le lhs rhs thn els -> IfLe lhs rhs <$> go thn <*> go els
+      K.Let binder rhs body -> Let binder <$> go rhs <*> go body
       K.LetRec FunBind {name, args, rhs} body -> do
         rhs' <- go rhs
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
         body' <- go body
         output $ FunDef {name = toLabel name, args, formalFv = fv, rhs = rhs'}
         pure body'
-      K.App fun params -> pure $ AppDir (toLabel fun) params
-      K.Tuple idents -> pure $ Tuple idents
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> go body
-      K.Get arr idx -> pure $ Get arr idx
-      K.Put arr idx rhs -> pure $ Put arr idx rhs
+      K.App fun params -> pure $ AppDir (toLabel fun) params
 
     freeVars = \case
       (Unit; Int _; Float _) -> S.empty
