@@ -1,4 +1,4 @@
-module Hamal (Dump (..), Phase (..), Stage (..), phase, compile, CompileError (..), phaseName) where
+module Hamal (Inspect (..), Phase (..), Stage (..), phase, compile, CompileError (..), phaseName) where
 
 import Backend.Riscv.Asm (Reg)
 import Backend.Riscv.Asm qualified as V
@@ -66,21 +66,21 @@ phaseName = \case
   Virtual -> "virtual"
   RegAlloc -> "regalloc"
 
-data Dump :: Effect where
-  Dump :: (Show a) => Stage a -> a -> Dump m ()
+data Inspect :: Effect where
+  Inspect :: (Show a) => Stage a -> a -> Inspect m ()
 
-type instance DispatchOf Dump = Dynamic
+type instance DispatchOf Inspect = Dynamic
 
 newtype CompileError = ParseError String
   deriving newtype (Show, Eq)
 
-stage :: (Show a, Dump :> es) => Stage a -> Eff es a -> Eff es a
+stage :: (Show a, Inspect :> es) => Stage a -> Eff es a -> Eff es a
 stage s m = do
   x <- m
-  send (Dump s x)
+  send (Inspect s x)
   pure x
 
-compile :: (Error CompileError :> es, Dump :> es) => ByteString -> Eff es Builder
+compile :: (Error CompileError :> es, Inspect :> es) => ByteString -> Eff es Builder
 compile input = runFresh do
   syntax <- stage SParsed . either (throwError . ParseError) pure $ runAlex input parse
   knorm <- stage SKNormal . kNormal $ syntax
