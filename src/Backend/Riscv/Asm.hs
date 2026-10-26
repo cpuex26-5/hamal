@@ -3,6 +3,7 @@ module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg 
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec)
 import Name (Id, Label)
+import PrimOp (Cmp)
 
 data Block r
   = Ans (Inst r)
@@ -21,8 +22,7 @@ data Inst r
   | Lw Int r
   | Lwl Int Label
   | Sw r r Int
-  | IfEq r r (Block r) (Block r)
-  | IfLe r r (Block r) (Block r)
+  | If Cmp r r (Block r) (Block r)
   | CallDir Label [r]
   | Save r Id
   | Restore Id

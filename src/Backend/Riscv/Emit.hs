@@ -8,6 +8,7 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
 import Name (Fresh, Id, external, internal, refresh)
+import PrimOp (Cmp (..))
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
@@ -24,8 +25,7 @@ mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
       Let _ rhs body -> saveI rhs <> saveB body
     saveI = \case
       Nop; Li {}; La {}; Mv {}; Add {}; Addi {}; Neg {}; Sub {}; Lw {}; Lwl {}; Sw {}; CallDir {}; Restore {} -> []
-      IfEq _ _ thn els -> saveB thn <> saveB els
-      IfLe _ _ thn els -> saveB thn <> saveB els
+      If _ _ _ thn els -> saveB thn <> saveB els
       Save _ ident -> [ident]
 
 emitNonTail :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Reg -> Inst Reg -> Eff es ()
@@ -43,19 +43,13 @@ emitNonTail rd = \case
     tell ("\tla\t" <> build T0 <> ", " <> build label <> "\n")
       *> tell ("\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build T0 <> ")\n")
   Sw rd' rs offset -> tell $ "\tsw\t" <> build rd' <> ", " <> BB.intDec offset <> "(" <> build rs <> ")\n"
-  IfEq lhs rhs thn els -> do
+  If cmp lhs rhs thn els -> do
     label_else <- refresh (internal "else")
     label_cont <- refresh (internal "cont")
-    tell $ "\tbne\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
-    emitBlock (NonTail rd) thn
-    tell $ "\tj\t" <> build label_cont <> "\n"
-    tell $ build label_else <> ":\n"
-    emitBlock (NonTail rd) els
-    tell $ build label_cont <> ":\n"
-  IfLe lhs rhs thn els -> do
-    label_else <- refresh (internal "else")
-    label_cont <- refresh (internal "cont")
-    tell $ "\tbgt\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
+    let b = case cmp of
+          Eq -> "bne"
+          Le -> "bgt"
+    tell $ "\t" <> b <> "\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
     emitBlock (NonTail rd) thn
     tell $ "\tj\t" <> build label_cont <> "\n"
     tell $ build label_else <> ":\n"
