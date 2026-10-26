@@ -7,7 +7,7 @@ import Data.Map qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
-import Id (Fresh, Id, fresh, mkName, toLabel)
+import Name (Fresh, Id, external, internal, refresh)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
@@ -44,8 +44,8 @@ emitNonTail rd = \case
       *> tell ("\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build T0 <> ")\n")
   Sw rd' rs offset -> tell $ "\tsw\t" <> build rd' <> ", " <> BB.intDec offset <> "(" <> build rs <> ")\n"
   IfEq lhs rhs thn els -> do
-    label_else <- toLabel <$> fresh "else"
-    label_cont <- toLabel <$> fresh "cont"
+    label_else <- refresh (internal "else")
+    label_cont <- refresh (internal "cont")
     tell $ "\tbne\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
     emitBlock (NonTail rd) thn
     tell $ "\tj\t" <> build label_cont <> "\n"
@@ -53,8 +53,8 @@ emitNonTail rd = \case
     emitBlock (NonTail rd) els
     tell $ build label_cont <> ":\n"
   IfLe lhs rhs thn els -> do
-    label_else <- toLabel <$> fresh "else"
-    label_cont <- toLabel <$> fresh "cont"
+    label_else <- refresh (internal "else")
+    label_cont <- refresh (internal "cont")
     tell $ "\tbgt\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
     emitBlock (NonTail rd) thn
     tell $ "\tj\t" <> build label_cont <> "\n"
@@ -94,4 +94,4 @@ emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
   mapM_ emitFun fundefs
   tell @BB.Builder ".global\tmin_caml_start\n"
-  emitFun (FunDef (mkName "min_caml_start") [] block)
+  emitFun (FunDef (external "min_caml_start") [] block)

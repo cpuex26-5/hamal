@@ -2,8 +2,8 @@ module Middleend.Opt.Beta (betaConvert) where
 
 import Data.Function (on)
 import Data.Map qualified as M
-import Id (Id)
 import Middleend.KNormal (Exp (..), FunBind (..))
+import Name (Id)
 
 betaConvert :: Exp -> Exp
 betaConvert = go M.empty

@@ -58,12 +58,12 @@ library
     Frontend.Syntax
     Frontend.Token
     Hamal
-    Id
     Middleend.Closure
     Middleend.KNormal
     Middleend.Opt.Alpha
     Middleend.Opt.Assoc
     Middleend.Opt.Beta
+    Name
 
   build-tool-depends:
     alex:alex,

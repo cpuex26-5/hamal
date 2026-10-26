@@ -14,7 +14,6 @@ import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
 import Frontend.SrcSpan (SrcSpan)
 import Frontend.Syntax (Syntax)
-import Id (Id, runFresh)
 import Middleend.Closure (closureConvert)
 import Middleend.Closure qualified as C
 import Middleend.KNormal (kNormal)
@@ -22,6 +21,7 @@ import Middleend.KNormal qualified as K
 import Middleend.Opt.Alpha (alphaConvert)
 import Middleend.Opt.Assoc (assocLet)
 import Middleend.Opt.Beta (betaConvert)
+import Name (Id, runFresh)
 
 data Phase
   = Parsed

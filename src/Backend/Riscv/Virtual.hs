@@ -2,8 +2,8 @@ module Backend.Riscv.Virtual (genVirtual) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..))
 import Effectful (Eff, (:>))
-import Id (Fresh, Id)
 import Middleend.Closure qualified as C
+import Name (Fresh, Id)
 
 virtualBlock :: (Fresh :> es) => C.Exp -> Eff es (Block Id)
 virtualBlock = \case

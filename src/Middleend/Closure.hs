@@ -3,9 +3,9 @@ module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), clo
 import Data.Set qualified as S
 import Effectful (Eff, runPureEff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
-import Id (Id, Label, toLabel)
 import Middleend.KNormal (FunBind (FunBind))
 import Middleend.KNormal qualified as K
+import Name (Id, Label, toLabel)
 
 data Closure = Closure
   { entry :: Label

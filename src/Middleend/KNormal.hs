@@ -5,7 +5,7 @@ import Effectful ((:>))
 import Effectful.Internal.Monad (Eff)
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
-import Id (Fresh, Id, fresh, mkName)
+import Name (Fresh, Id, external, internal, refresh)
 
 data Exp
   = Unit
@@ -46,7 +46,7 @@ insertLet scrutM k = do
   case scrut of
     Var x -> k x
     _ -> do
-      tmp <- fresh "T"
+      tmp <- refresh (internal "T")
       body <- k tmp
       pure $ Let tmp scrut body
 
@@ -103,7 +103,7 @@ kNormal Syntax {ann, kind} = case kind of
   -- TODO: create_float_array
   S.Array len initial -> insertLet (kNormal len) \len' ->
     insertLet (kNormal initial) \initial' ->
-      pure $ App (mkName "create_array") [len', initial']
+      pure $ App (external "create_array") [len', initial']
   S.Get arr idx -> insertLet (kNormal arr) \lhs' ->
     insertLet (kNormal idx) (pure . Get lhs')
   S.Put arr idx rhs -> insertLet (kNormal arr) \lhs' ->

@@ -5,8 +5,8 @@ import Data.Map qualified as M
 import Effectful ((:>))
 import Effectful.Internal.Monad (Eff)
 import Effectful.Reader.Static (Reader, asks, local, runReader)
-import Id (Fresh, Id, refresh)
 import Middleend.KNormal (Exp (..), FunBind (..))
+import Name (Fresh, Id, refresh)
 
 alphaConvert :: (Fresh :> es) => Exp -> Eff es Exp
 alphaConvert = runReader @(M.Map Id Id) M.empty . go

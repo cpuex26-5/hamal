@@ -2,7 +2,7 @@ module Backend.Riscv.RegAlloc (regAlloc) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
 import Data.Bifunctor (Bifunctor (bimap))
-import Id (Id)
+import Name (Id)
 
 regAlloc :: Program Id -> Program Reg
 regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock block)

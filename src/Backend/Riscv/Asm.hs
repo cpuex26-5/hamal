@@ -2,7 +2,7 @@ module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg 
 
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec)
-import Id (Id, Label)
+import Name (Id, Label)
 
 data Block r
   = Ans (Inst r)

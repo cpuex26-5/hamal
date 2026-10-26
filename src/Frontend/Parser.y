@@ -7,7 +7,7 @@ import Frontend.Lexer
 import Frontend.SrcSpan
 import Frontend.Syntax
 import Frontend.Token
-import Id
+import Name
 }
 
 %name parse
@@ -91,7 +91,7 @@ expr :: { Syntax SrcSpan }
   | elems %prec prec_tuple { Syntax (foldMap1 (.ann) $1) $ Tuple (toList $1) }
   | let '(' pattern ')' '=' expr in expr { Syntax ($1 <> $8.ann) $ LetTuple $3 $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { Syntax ($1.ann <> $7.ann) $ Put $1 $4 $7 }
-  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (mkName "_") $1 $3 }
+  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (internal "_") $1 $3 }
   | arraycreate simple_expr simple_expr %prec prec_app { Syntax ($1 <> $3.ann) $ Array $2 $3 }
 
 

@@ -5,7 +5,7 @@ import Data.ByteString (toStrict)
 import Data.ByteString.Lazy.Char8 qualified as BS
 import Data.ByteString.Short (toShort)
 import Frontend.SrcSpan (Located (..), SrcSpan)
-import Id (Id, mkName)
+import Name (Id, internal)
 import Prelude hiding (span)
 
 data Token
@@ -49,7 +49,7 @@ literal :: (Token -> Maybe a) -> Located Token -> Maybe (Located a)
 literal = traverse
 
 identOf :: Token -> Maybe Id
-identOf (TIdent ident) = Just . mkName . toShort . toStrict $ ident
+identOf (TIdent ident) = Just . internal . toShort . toStrict $ ident
 identOf _ = Nothing
 
 intOf :: Token -> Maybe Int
