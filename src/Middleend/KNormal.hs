@@ -6,7 +6,7 @@ import Data.Bool (bool)
 import Effectful (Eff, (:>))
 import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
-import Name (Fresh, Id, external, internal, refresh)
+import Name (Fresh, Id, Symbol (..), fresh)
 import PrimOp (Cmp (..), PrimOp (..))
 
 data Exp
@@ -37,7 +37,7 @@ insertLet scrutM k = do
   case scrut of
     Var x -> k x
     _ -> do
-      tmp <- refresh (internal "T")
+      tmp <- fresh "T"
       body <- k tmp
       pure $ Let tmp scrut body
 
@@ -48,20 +48,24 @@ kNormal s = evalContT $ case s.kind of
   S.Float float -> pure $ Float float
   S.Bool bol -> pure . Int $ bool 0 1 bol
   (S.Not {}; S.Cmp {}) -> kIf s (pure (Int 1)) (pure (Int 0))
-  S.Var name -> pure $ Var name
+  S.Var (Symbol sym) -> Var <$> lift (fresh sym)
   S.PrimOp op -> PrimOp <$> traverse atomize op
   S.If cnd thn els -> kIf cnd (kNormal thn) (kNormal els)
-  S.Let binder rhs body -> Let binder <$> lift (kNormal rhs) <*> lift (kNormal body)
-  S.LetRec S.FunBind {name, args, rhs} body -> do
+  S.Let binder rhs body -> Let <$> (\(Symbol sym) -> lift (fresh sym)) binder <*> lift (kNormal rhs) <*> lift (kNormal body)
+  S.LetRec S.FunBind {name = Symbol name, args, rhs} body -> do
+    name' <- lift (fresh name)
+    args' <- freshes args
     rhs' <- lift $ kNormal rhs
     body' <- lift $ kNormal body
-    pure $ LetRec (FunBind {name, args, rhs = rhs'}) body'
+    pure $ LetRec (FunBind {name = name', args = args', rhs = rhs'}) body'
   -- TODO: external functions
   S.App fun params -> App <$> atomize fun <*> traverse atomize params
-  S.LetTuple binders rhs body -> LetTuple binders <$> atomize rhs <*> lift (kNormal body)
+  S.LetTuple binders rhs body -> LetTuple <$> freshes binders <*> atomize rhs <*> lift (kNormal body)
   -- TODO: create_float_array
-  S.Array len initial -> App (external "create_array") <$> traverse atomize [len, initial]
+  -- TODO: PrimOp
+  S.Array len initial -> App <$> lift (fresh "create_array") <*> traverse atomize [len, initial]
   where
+    freshes = mapM (\(Symbol sym) -> lift (fresh sym))
     atom = ContT . insertLet
     atomize = atom . kNormal
     kIf cnd thn els = case cnd.kind of

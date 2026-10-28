@@ -92,7 +92,7 @@ expr :: { Syntax SrcSpan }
   | elems %prec prec_tuple { Syntax (foldMap1 (.ann) $1) $ PrimOp (Tuple (toList $1)) }
   | let '(' pattern ')' '=' expr in expr { Syntax ($1 <> $8.ann) $ LetTuple $3 $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { Syntax ($1.ann <> $7.ann) $ PrimOp (Put $1 $4 $7) }
-  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (internal "_") $1 $3 }
+  | expr ';' expr { Syntax ($1.ann <> $3.ann) $ Let (Symbol "_") $1 $3 }
   | arraycreate simple_expr simple_expr %prec prec_app { Syntax ($1 <> $3.ann) $ Array $2 $3 }
 
 
@@ -108,7 +108,7 @@ simple_expr :: { Syntax SrcSpan }
 funbind :: { FunBind SrcSpan }
   : ident arguments '=' expr { FunBind $1.value $2 $4 }
 
-arguments :: { [Id] }
+arguments :: { [Symbol] }
   : ident arguments { $1.value : $2 }
   | ident { [$1.value] }
 
@@ -120,7 +120,7 @@ elems :: { NonEmpty (Syntax SrcSpan) }
   : elems ',' expr { $1 <> pure $3 }
   | expr ',' expr { $1 :| pure $3 }
 
-pattern :: { [Id] }
+pattern :: { [Symbol] }
   : pattern ',' ident { $1 <> [$3.value] }
   | ident ',' ident { [$1.value, $3.value] }
 

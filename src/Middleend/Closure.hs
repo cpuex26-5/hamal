@@ -5,7 +5,7 @@ import Effectful (Eff, runPureEff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
 import Middleend.KNormal (FunBind (FunBind))
 import Middleend.KNormal qualified as K
-import Name (Id, Label, toLabel)
+import Name (Id, Label (Local))
 import PrimOp (Cmp, PrimOp)
 
 data Closure = Closure
@@ -56,10 +56,10 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
         rhs' <- go rhs
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
         body' <- go body
-        output $ FunDef {name = toLabel name, args, formalFv = fv, rhs = rhs'}
+        output $ FunDef {name = Local name, args, formalFv = fv, rhs = rhs'}
         pure body'
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> go body
-      K.App fun params -> pure $ AppDir (toLabel fun) params
+      K.App fun params -> pure $ AppDir (Local fun) params
 
     freeVars = \case
       (Unit; Int _; Float _) -> S.empty

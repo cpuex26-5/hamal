@@ -1,4 +1,4 @@
-module Name (Id, Label, Fresh, toLabel, refresh, runFresh, external, internal) where
+module Name (Symbol (..), Id, Label (..), Fresh, fresh, refresh, runFresh) where
 
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec, shortByteString)
@@ -6,37 +6,22 @@ import Data.ByteString.Short (ShortByteString)
 import Effectful (Dispatch (..), DispatchOf, Eff, Effect, (:>))
 import Effectful.Dispatch.Static (SideEffects (..), StaticRep, evalStaticRep, stateStaticRep)
 
-data NameSpace = Local | Global
+newtype Symbol = Symbol ShortByteString
+  deriving newtype (Show, Eq)
 
-data NameSort = Internal Int | External
+data Id = Id {unique :: Int, hint :: ShortByteString}
   deriving stock (Eq, Ord)
 
-data Name (s :: NameSpace)
-  = Name {hint :: ShortByteString, sort :: NameSort}
-  deriving stock (Eq, Ord)
+data Label = Local Id | Global Symbol
+  deriving stock (Show, Eq)
 
-instance Show (Name s) where
-  show Name {hint, sort} = case sort of
-    Internal n -> show hint <> "." <> show n
-    External -> show hint
+instance Show Id where
+  show Id {unique, hint} = show hint <> "." <> show unique
 
-instance Buildable (Name s) where
-  build Name {hint, sort} = case sort of
-    Internal n -> shortByteString hint <> "." <> intDec n
-    External -> shortByteString hint
-
-type Id = Name Local
-
-type Label = Name Global
-
-internal :: ShortByteString -> Name s
-internal hint = Name {hint, sort = Internal 0}
-
-external :: ShortByteString -> Name s
-external hint = Name {hint, sort = External}
-
-toLabel :: Id -> Label
-toLabel (Name {..}) = Name {..}
+instance Buildable Label where
+  build = \case
+    Local Id {unique, hint} -> shortByteString hint <> intDec unique
+    Global (Symbol sym) -> shortByteString sym
 
 data Fresh :: Effect
 
@@ -47,5 +32,8 @@ newtype instance StaticRep Fresh = Counter Int
 runFresh :: Eff (Fresh : es) a -> Eff es a
 runFresh = evalStaticRep (Counter 1)
 
-refresh :: (Fresh :> es) => Name s -> Eff es (Name s)
-refresh name = stateStaticRep \(Counter n) -> (name {sort = Internal n}, Counter (n + 1))
+fresh :: (Fresh :> es) => ShortByteString -> Eff es Id
+fresh hint = refresh Id {hint, unique = 0}
+
+refresh :: (Fresh :> es) => Id -> Eff es Id
+refresh name = stateStaticRep \(Counter n) -> (name {unique = n}, Counter (n + 1))
