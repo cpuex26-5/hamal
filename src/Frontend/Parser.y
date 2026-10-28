@@ -35,6 +35,8 @@ import PrimOp
   arraycreate { (symbol TArrayCreate -> Just $$) }
   '+'         { (symbol TPlus -> Just $$) }
   '-'         { (symbol TMinus -> Just $$) }
+  '*'         { (symbol TTimes -> Just $$) }
+  '/'         { (symbol TDivide -> Just $$) }
   '+.'        { (symbol TPlusDot -> Just $$) }
   '-.'        { (symbol TMinusDot -> Just $$) }
   '*.'        { (symbol TTimesDot -> Just $$) }
@@ -61,7 +63,7 @@ import PrimOp
 %left ','
 %left '=' '<>' '<' '>' '<=' '>='
 %left '+' '-' '+.' '-.'
-%left '*.' '/.'
+%left '*' '/' '*.' '/.'
 %right prec_unary_minus
 %left prec_app
 %left '.'
@@ -77,6 +79,8 @@ expr :: { Parsed }
   | '-.' expr %prec prec_unary_minus { $1 <> extract $2 :< PrimOp (FNeg $2) }
   | expr '+'  expr { extract $1 <> extract $3 :< PrimOp (Add $1 $3) }
   | expr '-'  expr { extract $1 <> extract $3 :< PrimOp (Sub $1 $3) }
+  | expr '*'  expr { extract $1 <> extract $3 :< PrimOp (Mul $1 $3) }
+  | expr '/'  expr { extract $1 <> extract $3 :< PrimOp (Div $1 $3) }
   | expr '+.' expr { extract $1 <> extract $3 :< PrimOp (FAdd $1 $3) }
   | expr '-.' expr { extract $1 <> extract $3 :< PrimOp (FSub $1 $3) }
   | expr '*.' expr { extract $1 <> extract $3 :< PrimOp (FMul $1 $3) }

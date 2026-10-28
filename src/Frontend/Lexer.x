@@ -51,6 +51,8 @@ tokens :-
 
 <0> "+"                                         { tok TPlus }
 <0> "-"                                         { tok TMinus }
+<0> "*"                                         { tok TTimes }
+<0> "/"                                         { tok TDivide }
 <0> "+."                                        { tok TPlusDot }
 <0> "-."                                        { tok TMinusDot }
 <0> "*."                                        { tok TTimesDot }

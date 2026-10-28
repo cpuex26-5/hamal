@@ -23,6 +23,8 @@ data Token
   | TArrayCreate
   | TPlus
   | TMinus
+  | TTimes
+  | TDivide
   | TPlusDot
   | TMinusDot
   | TTimesDot

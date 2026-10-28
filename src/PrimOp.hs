@@ -9,6 +9,8 @@ data PrimOp a
   | FNeg a
   | Add a a
   | Sub a a
+  | Mul a a
+  | Div a a
   | FAdd a a
   | FSub a a
   | FMul a a
