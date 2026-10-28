@@ -1,36 +1,33 @@
-module Frontend.Syntax (Syntax (..), SyntaxKind (..), FunBind (..)) where
+module Frontend.Syntax (ExpF (..), FunBind (..), Parsed) where
 
+import Control.Comonad.Cofree (Cofree (..))
+import Data.Functor.Classes (Show1)
+import Frontend.SrcSpan (SrcSpan)
+import GHC.Generics (Generic1)
+import Generic.Data (Generically1 (..))
 import Name (Symbol)
 import PrimOp (Cmp, PrimOp)
 
-data Syntax a = Syntax {ann :: a, kind :: SyntaxKind a}
-  deriving stock (Eq, Functor, Foldable, Traversable)
-
-instance Show (Syntax a) where
-  show Syntax {kind} = "(" <> show kind <> ")"
-
--- TODO: maybe better to use 'NonEmpty'
-
-data SyntaxKind a
+data ExpF b r
   = Unit
   | Bool Bool
   | Int Int
   | Float Float
   | Var Symbol
-  | Not (Syntax a)
-  | PrimOp (PrimOp (Syntax a))
-  | Cmp Cmp (Syntax a) (Syntax a)
-  | If (Syntax a) (Syntax a) (Syntax a)
-  | Let Symbol (Syntax a) (Syntax a)
-  | LetRec (FunBind a) (Syntax a)
-  | LetTuple [Symbol] (Syntax a) (Syntax a)
-  | App (Syntax a) [Syntax a]
-  | Array (Syntax a) (Syntax a)
-  deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  | PrimOp (PrimOp r)
+  | Not r
+  | Cmp Cmp r r
+  | If r r r
+  | Let b r r
+  | LetRec (FunBind b r) r
+  | LetTuple [b] r r
+  | App r [r]
+  | Array r r
+  deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
+  deriving (Show1) via Generically1 (ExpF b)
 
-data FunBind a = FunBind
-  { name :: Symbol
-  , args :: [Symbol]
-  , rhs :: Syntax a
-  }
-  deriving stock (Eq, Show, Functor, Foldable, Traversable)
+data FunBind b r = FunBind {binder :: b, args :: [b], rhs :: r}
+  deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
+  deriving (Show1) via Generically1 (FunBind b)
+
+type Parsed = Cofree (ExpF Symbol) SrcSpan

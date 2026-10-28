@@ -1,10 +1,10 @@
 module Middleend.KNormal (Exp (..), FunBind (..), kNormal) where
 
+import Control.Comonad.Cofree (Cofree (..))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Cont (ContT (..), evalContT)
 import Data.Bool (bool)
 import Effectful (Eff, (:>))
-import Frontend.Syntax (Syntax (..))
 import Frontend.Syntax qualified as S
 import Name (Fresh, Id, Symbol (..), fresh)
 import PrimOp (Cmp (..), PrimOp (..))
@@ -41,18 +41,18 @@ insertLet scrutM k = do
       body <- k tmp
       pure $ Let tmp scrut body
 
-kNormal :: (Fresh :> es) => Syntax a -> Eff es Exp
-kNormal s = evalContT $ case s.kind of
+kNormal :: (Fresh :> es) => S.Parsed -> Eff es Exp
+kNormal expr@(_ :< t) = evalContT $ case t of
   S.Unit -> pure Unit
   S.Int int -> pure $ Int int
   S.Float float -> pure $ Float float
   S.Bool bol -> pure . Int $ bool 0 1 bol
-  (S.Not {}; S.Cmp {}) -> kIf s (pure (Int 1)) (pure (Int 0))
+  (S.Not {}; S.Cmp {}) -> kIf expr (pure (Int 1)) (pure (Int 0))
   S.Var (Symbol sym) -> Var <$> lift (fresh sym)
   S.PrimOp op -> PrimOp <$> traverse atomize op
   S.If cnd thn els -> kIf cnd (kNormal thn) (kNormal els)
   S.Let binder rhs body -> Let <$> (\(Symbol sym) -> lift (fresh sym)) binder <*> lift (kNormal rhs) <*> lift (kNormal body)
-  S.LetRec S.FunBind {name = Symbol name, args, rhs} body -> do
+  S.LetRec S.FunBind {binder = Symbol name, args, rhs} body -> do
     name' <- lift (fresh name)
     args' <- freshes args
     rhs' <- lift $ kNormal rhs
@@ -68,7 +68,6 @@ kNormal s = evalContT $ case s.kind of
     freshes = mapM (\(Symbol sym) -> lift (fresh sym))
     atom = ContT . insertLet
     atomize = atom . kNormal
-    kIf cnd thn els = case cnd.kind of
-      S.Not c -> kIf c els thn
-      S.Cmp cmp lhs rhs -> If cmp <$> atomize lhs <*> atomize rhs <*> lift thn <*> lift els
-      _ -> If Eq <$> atomize cnd <*> atom (pure (Int 1)) <*> lift thn <*> lift els
+    kIf (_ :< S.Not c) thn els = kIf c els thn
+    kIf (_ :< S.Cmp cmp lhs rhs) thn els = If cmp <$> atomize lhs <*> atomize rhs <*> lift thn <*> lift els
+    kIf cnd thn els = If Eq <$> atomize cnd <*> atom (pure (Int 1)) <*> lift thn <*> lift els

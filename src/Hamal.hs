@@ -12,8 +12,7 @@ import Effectful.Dispatch.Dynamic (send)
 import Effectful.Error.Static (Error, throwError)
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
-import Frontend.SrcSpan (SrcSpan)
-import Frontend.Syntax (Syntax)
+import Frontend.Syntax (Parsed)
 import Middleend.Closure (closureConvert)
 import Middleend.Closure qualified as C
 import Middleend.KNormal (kNormal)
@@ -35,7 +34,7 @@ data Phase
   deriving stock (Show, Eq, Ord, Enum, Bounded)
 
 data Stage a where
-  SParsed :: Stage (Syntax SrcSpan)
+  SParsed :: Stage Parsed
   SKNormal :: Stage K.Exp
   SAlpha :: Stage K.Exp
   SBeta :: Stage K.Exp

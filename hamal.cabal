@@ -30,6 +30,7 @@ common defaults
   default-extensions:
     BlockArguments
     DuplicateRecordFields
+    DerivingVia
     MultiWayIf
     NoFieldSelectors
     OrPatterns
@@ -73,9 +74,12 @@ library
   build-depends:
     array,
     bytestring,
+    comonad,
     containers,
-    transformers,
     effectful-core,
+    free,
+    generic-data,
+    transformers,
 
   hs-source-dirs: src
 
