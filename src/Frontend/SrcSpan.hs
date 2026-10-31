@@ -1,7 +1,10 @@
 module Frontend.SrcSpan (Posn (..), SrcSpan (..), Located (..)) where
 
 data Posn = Posn {offset, line, column :: Int}
-  deriving stock (Eq, Show)
+  deriving stock (Eq)
+
+instance Show Posn where
+  show Posn {line, column} = show line <> ":" <> show column
 
 data SrcSpan = SrcSpan {start, stop :: Posn}
   deriving stock (Eq, Show)

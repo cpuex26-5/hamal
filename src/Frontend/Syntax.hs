@@ -1,7 +1,7 @@
 module Frontend.Syntax (ExpF (..), Binder (..), FunBind (..), Parsed, Typed) where
 
 import Control.Comonad.Cofree (Cofree (..))
-import Data.Bifunctor.TH (deriveBifunctor)
+import Data.Bifunctor.TH (deriveBifoldable, deriveBifunctor, deriveBitraversable)
 import Data.Functor.Classes (Show1)
 import Frontend.SrcSpan (SrcSpan)
 import GHC.Generics (Generic1)
@@ -38,7 +38,11 @@ data FunBind b r = FunBind {binder :: b, args :: [b], rhs :: r}
 
 type Parsed = Cofree (ExpF ()) SrcSpan
 
-type Typed = Cofree (ExpF Type) Type
+type Typed = Cofree (ExpF Type) SrcSpan
 
 deriveBifunctor ''FunBind
+deriveBifoldable ''FunBind
+deriveBitraversable ''FunBind
 deriveBifunctor ''ExpF
+deriveBifoldable ''ExpF
+deriveBitraversable ''ExpF
