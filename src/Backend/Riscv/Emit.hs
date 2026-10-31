@@ -7,7 +7,7 @@ import Data.Map qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
-import Name (Fresh, Id, Label (..), Symbol (Symbol), fresh)
+import Name (Fresh, Id, Label (..), fresh)
 import PrimOp (Cmp (..))
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
@@ -88,4 +88,4 @@ emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
   mapM_ emitFun fundefs
   tell @BB.Builder ".global\tmin_caml_start\n"
-  emitFun (FunDef (Global (Symbol "min_caml_start")) [] block)
+  emitFun (FunDef (Global "min_caml_start") [] block)

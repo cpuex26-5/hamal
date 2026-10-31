@@ -1,14 +1,20 @@
-module Frontend.Syntax (ExpF (..), FunBind (..), Parsed) where
+module Frontend.Syntax (ExpF (..), Binder (..), FunBind (..), Parsed, Typed) where
 
 import Control.Comonad.Cofree (Cofree (..))
+import Data.Bifunctor.TH (deriveBifunctor)
 import Data.Functor.Classes (Show1)
 import Frontend.SrcSpan (SrcSpan)
 import GHC.Generics (Generic1)
 import Generic.Data (Generically1 (..))
 import Name (Symbol)
 import PrimOp (Cmp, PrimOp)
+import Type (Type)
 
-data ExpF b r
+data Binder t = Binder {name :: Symbol, ty :: t}
+  deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
+  deriving (Show1) via Generically1 Binder
+
+data ExpF t r
   = Unit
   | Bool Bool
   | Int Int
@@ -18,16 +24,21 @@ data ExpF b r
   | Not r
   | Cmp Cmp r r
   | If r r r
-  | Let b r r
-  | LetRec (FunBind b r) r
-  | LetTuple [b] r r
+  | Let (Binder t) r r
+  | LetRec (FunBind (Binder t) r) r
+  | LetTuple [Binder t] r r
   | App r [r]
   | Array r r
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
-  deriving (Show1) via Generically1 (ExpF b)
+  deriving (Show1) via Generically1 (ExpF t)
 
 data FunBind b r = FunBind {binder :: b, args :: [b], rhs :: r}
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 (FunBind b)
 
-type Parsed = Cofree (ExpF Symbol) SrcSpan
+type Parsed = Cofree (ExpF ()) SrcSpan
+
+type Typed = Cofree (ExpF Type) Type
+
+deriveBifunctor ''FunBind
+deriveBifunctor ''ExpF

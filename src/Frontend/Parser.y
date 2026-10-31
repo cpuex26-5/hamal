@@ -92,13 +92,13 @@ expr :: { Parsed }
   | expr '<'  expr { extract $1 <> extract $3 :< Not (extract $1 <> extract $3 :< Cmp Le $3 $1) }
   | expr '>'  expr { extract $1 <> extract $3 :< Not (extract $1 <> extract $3 :< Cmp Le $1 $3) }
   | if expr then expr else expr %prec prec_if { $1 <> extract $6 :< If $2 $4 $6 }
-  | let ident '=' expr in expr %prec prec_let { $1 <> extract $6 :< Let $2.value $4 $6 }
+  | let ident '=' expr in expr %prec prec_let { $1 <> extract $6 :< Let (binder $2.value) $4 $6 }
   | let rec funbind in expr    %prec prec_let { $1 <> extract $5 :< LetRec $3 $5 }
   | simple_expr parameters     %prec prec_app { foldMap1 extract ($1 :| $2) :< App $1 $2 }
   | elems %prec prec_tuple { foldMap1 extract $1 :< PrimOp (Tuple (toList $1)) }
-  | let '(' pattern ')' '=' expr in expr { $1 <> extract $8 :< LetTuple $3 $6 $8 }
+  | let '(' pattern ')' '=' expr in expr { $1 <> extract $8 :< LetTuple (binder <\$> $3) $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { extract $1 <> extract $7 :< PrimOp (Put $1 $4 $7) }
-  | expr ';' expr { extract $1 <> extract $3 :< Let (Symbol "_") $1 $3 }
+  | expr ';' expr { extract $1 <> extract $3 :< Let (binder "_") $1 $3 }
   | arraycreate simple_expr simple_expr %prec prec_app { $1 <> extract $3 :< Array $2 $3 }
 
 
@@ -111,8 +111,8 @@ simple_expr :: { Parsed }
   | ident                         { $1.span :< Var $1.value }
   | simple_expr '.' '(' expr ')'  { extract $1 <> $5 :< PrimOp (Get $1 $4) }
 
-funbind :: { FunBind Symbol Parsed }
-  : ident arguments '=' expr { FunBind $1.value $2 $4 }
+funbind :: { FunBind (Binder ()) Parsed }
+  : ident arguments '=' expr { FunBind (binder $1.value) (binder <\$> $2) $4 }
 
 arguments :: { [Symbol] }
   : ident arguments { $1.value : $2 }
@@ -131,6 +131,9 @@ pattern :: { [Symbol] }
   | ident   ',' ident { [$1.value, $3.value] }
 
 {
+binder :: Symbol -> Binder ()
+binder name = Binder { name, ty = () }
+
 parseError :: Located Token -> Alex a
 parseError _ = do
   (AlexPn _ line column, _, _, _) <- alexGetInput

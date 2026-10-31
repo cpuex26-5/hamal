@@ -9,10 +9,11 @@ import Data.ByteString.Builder (Builder)
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Effectful (Dispatch (..), DispatchOf, Eff, Effect, (:>))
 import Effectful.Dispatch.Dynamic (send)
-import Effectful.Error.Static (Error, throwError)
+import Effectful.Error.Static (Error, runErrorNoCallStackWith, throwError)
 import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
-import Frontend.Syntax (Parsed)
+import Frontend.Syntax (Parsed, Typed)
+import Frontend.Typing (TypeError, typing)
 import Middleend.Closure (closureConvert)
 import Middleend.Closure qualified as C
 import Middleend.KNormal (kNormal)
@@ -24,6 +25,7 @@ import Name (Id, runFresh)
 
 data Phase
   = Parsed
+  | Typed
   | KNormal
   | Alpha
   | Beta
@@ -35,6 +37,7 @@ data Phase
 
 data Stage a where
   SParsed :: Stage Parsed
+  STyped :: Stage Typed
   SKNormal :: Stage K.Exp
   SAlpha :: Stage K.Exp
   SBeta :: Stage K.Exp
@@ -46,6 +49,7 @@ data Stage a where
 phase :: Stage a -> Phase
 phase = \case
   SParsed -> Parsed
+  STyped -> Typed
   SKNormal -> KNormal
   SAlpha -> Alpha
   SBeta -> Beta
@@ -57,6 +61,7 @@ phase = \case
 phaseName :: Phase -> String
 phaseName = \case
   Parsed -> "parsed"
+  Typed -> "typed"
   KNormal -> "knorm"
   Alpha -> "alpha"
   Beta -> "beta"
@@ -70,8 +75,8 @@ data Inspect :: Effect where
 
 type instance DispatchOf Inspect = Dynamic
 
-newtype CompileError = ParseError String
-  deriving newtype (Show, Eq)
+data CompileError = ParseError String | TypeError TypeError
+  deriving stock (Show, Eq)
 
 stage :: (Show a, Inspect :> es) => Stage a -> Eff es a -> Eff es a
 stage s m = do
@@ -82,6 +87,7 @@ stage s m = do
 compile :: (Error CompileError :> es, Inspect :> es) => ByteString -> Eff es Builder
 compile input = runFresh do
   syntax <- stage SParsed . either (throwError . ParseError) pure $ runAlex input parse
+  _typed <- stage STyped . runErrorNoCallStackWith (throwError . TypeError) $ typing syntax
   knorm <- stage SKNormal . kNormal $ syntax
   alpha <- stage SAlpha . alphaConvert $ knorm
   beta <- stage SBeta . pure . betaConvert $ alpha

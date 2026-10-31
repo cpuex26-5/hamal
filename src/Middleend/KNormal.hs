@@ -6,7 +6,7 @@ import Control.Monad.Trans.Cont (ContT (..), evalContT)
 import Data.Bool (bool)
 import Effectful (Eff, (:>))
 import Frontend.Syntax qualified as S
-import Name (Fresh, Id, Symbol (..), fresh)
+import Name (Fresh, Id, fresh, wrap)
 import PrimOp (Cmp (..), PrimOp (..))
 
 data Exp
@@ -48,24 +48,22 @@ kNormal expr@(_ :< t) = evalContT $ case t of
   S.Float float -> pure $ Float float
   S.Bool bol -> pure . Int $ bool 0 1 bol
   (S.Not {}; S.Cmp {}) -> kIf expr (pure (Int 1)) (pure (Int 0))
-  S.Var (Symbol sym) -> Var <$> lift (fresh sym)
+  S.Var sym -> pure . Var . wrap $ sym
   S.PrimOp op -> PrimOp <$> traverse atomize op
   S.If cnd thn els -> kIf cnd (kNormal thn) (kNormal els)
-  S.Let binder rhs body -> Let <$> (\(Symbol sym) -> lift (fresh sym)) binder <*> lift (kNormal rhs) <*> lift (kNormal body)
-  S.LetRec S.FunBind {binder = Symbol name, args, rhs} body -> do
-    name' <- lift (fresh name)
-    args' <- freshes args
+  S.Let binder rhs body -> Let (wrap binder.name) <$> lift (kNormal rhs) <*> lift (kNormal body)
+  S.LetRec S.FunBind {binder, args, rhs} body -> do
+    let args' = wrap . (.name) <$> args
     rhs' <- lift $ kNormal rhs
     body' <- lift $ kNormal body
-    pure $ LetRec (FunBind {name = name', args = args', rhs = rhs'}) body'
+    pure $ LetRec (FunBind {name = wrap binder.name, args = args', rhs = rhs'}) body'
   -- TODO: external functions
   S.App fun params -> App <$> atomize fun <*> traverse atomize params
-  S.LetTuple binders rhs body -> LetTuple <$> freshes binders <*> atomize rhs <*> lift (kNormal body)
+  S.LetTuple binders rhs body -> LetTuple (map (wrap . (.name)) binders) <$> atomize rhs <*> lift (kNormal body)
   -- TODO: create_float_array
   -- TODO: PrimOp
-  S.Array len initial -> App <$> lift (fresh "create_array") <*> traverse atomize [len, initial]
+  S.Array len initial -> App (wrap "create_array") <$> traverse atomize [len, initial]
   where
-    freshes = mapM (\(Symbol sym) -> lift (fresh sym))
     atom = ContT . insertLet
     atomize = atom . kNormal
     kIf (_ :< S.Not c) thn els = kIf c els thn

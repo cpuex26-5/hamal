@@ -13,5 +13,5 @@ optionsP = Options <$> dumpsP
 dumpsP :: Parser (S.Set Phase)
 dumpsP = S.fromList . concat <$> many (asum (allP : (phaseP <$> [minBound ..])))
   where
-    phaseP p = flag' [p] $ long ("dump-" <> phaseName p) <> help ("Dump the IR after" <> phaseName p)
+    phaseP p = flag' [p] $ long ("dump-" <> phaseName p) <> help ("Dump the IR after " <> phaseName p)
     allP = flag' [minBound ..] (long "dump-all" <> help "Dump the IR after every phase")

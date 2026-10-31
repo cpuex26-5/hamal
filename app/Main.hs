@@ -9,11 +9,11 @@ import Effectful (Eff, IOE, MonadIO (..), runEff, (:>))
 import Effectful.Dispatch.Dynamic (interpret_)
 import Effectful.Error.Static (runErrorNoCallStack)
 import GHC.IO.StdHandles (stderr, stdout)
-import Hamal (CompileError (ParseError), Inspect (..), compile, phase, phaseName)
+import Hamal (CompileError (..), Inspect (..), compile, phase, phaseName)
 import Options (Options (..), optionsP)
 import Options.Applicative (execParser, fullDesc, helper, info, progDesc)
 import System.Exit (exitFailure)
-import System.IO (hPutStrLn)
+import System.IO (hPrint, hPutStrLn)
 import Text.Pretty.Simple qualified as P
 
 runInspect :: (IOE :> es) => Options -> Eff (Inspect : es) a -> Eff es a
@@ -33,4 +33,5 @@ main = do
   m <- runEff . runErrorNoCallStack @CompileError . runInspect opts . compile $ input
   case m of
     Left (ParseError msg) -> hPutStrLn stderr msg >> exitFailure
+    Left (TypeError typeError) -> hPrint stderr typeError >> exitFailure
     Right bb -> hPutBuilder stdout bb
