@@ -1,10 +1,10 @@
 module Backend.Riscv.Virtual (genVirtual) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..))
+import Basic qualified as B
 import Effectful (Eff, (:>))
 import Middleend.Closure qualified as C
 import Name (Fresh, Id)
-import PrimOp qualified as P
 
 virtualBlock :: (Fresh :> es) => C.Exp -> Eff es (Block Id)
 virtualBlock = \case
@@ -13,10 +13,10 @@ virtualBlock = \case
   C.Float _float -> undefined
   C.Var ident -> pure . Ans . Mv $ ident
   C.PrimOp op -> case op of
-    P.Neg e -> pure . Ans . Neg $ e
-    P.FNeg _ -> undefined
-    P.Add lhs rhs -> pure . Ans $ Add lhs rhs
-    P.Sub lhs rhs -> pure . Ans $ Sub lhs rhs
+    B.Neg e -> pure . Ans . Neg $ e
+    B.FNeg _ -> undefined
+    B.Add lhs rhs -> pure . Ans $ Add lhs rhs
+    B.Sub lhs rhs -> pure . Ans $ Sub lhs rhs
     _ -> undefined
   C.If cmp lhs rhs thn els -> (\thn' els' -> Ans $ If cmp lhs rhs thn' els') <$> virtualBlock thn <*> virtualBlock els
   C.Let binder rhs body -> insertLet binder <$> virtualBlock rhs <*> virtualBlock body

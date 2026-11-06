@@ -1,4 +1,4 @@
-module PrimOp (PrimOp (..), Cmp (..)) where
+module Basic (PrimOp (..), Cmp (..)) where
 
 import Data.Functor.Classes (Show1)
 import GHC.Generics (Generic1)

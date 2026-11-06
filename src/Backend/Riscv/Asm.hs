@@ -1,9 +1,9 @@
 module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
 
+import Basic (Cmp)
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec)
 import Name (Id, Label)
-import PrimOp (Cmp)
 
 data Block r
   = Ans (Inst r)

@@ -1,12 +1,12 @@
 module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
 
+import Basic (Cmp, PrimOp)
 import Data.Set qualified as S
 import Effectful (Eff, runPureEff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
 import Middleend.KNormal (FunBind (..))
 import Middleend.KNormal qualified as K
 import Name (Id, Label (Local))
-import PrimOp (Cmp, PrimOp)
 
 data Closure = Closure
   { entry :: Label

@@ -1,5 +1,6 @@
 module Frontend.Typing (TypeError (..), typing) where
 
+import Basic qualified as B
 import Control.Comonad (Comonad (extract))
 import Control.Comonad.Cofree (Cofree (..))
 import Control.Monad (when, zipWithM_)
@@ -14,7 +15,6 @@ import Effectful.State.Static.Local (State, get, modify, runState)
 import Frontend.SrcSpan (SrcSpan)
 import Frontend.Syntax qualified as S
 import Name (Fresh, Symbol, freshI)
-import PrimOp qualified as P
 import Type qualified as T
 
 data TypeError
@@ -129,18 +129,18 @@ infer (sspan :< expr) = case expr of
     withBinders binders = local (M.union $ M.fromList [(name, ty) | S.Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
-      P.Neg {}; P.Add {}; P.Sub {}; P.Mul {}; P.Div {} -> traverse_ (`ascribe` T.Int) op $> T.Int
-      P.FNeg {}; P.FAdd {}; P.FSub {}; P.FMul {}; P.FDiv {} -> traverse_ (`ascribe` T.Float) op $> T.Float
-      P.Tuple tys -> pure (T.Tuple . map typeof $ tys)
-      P.Array size initial -> do
+      B.Neg {}; B.Add {}; B.Sub {}; B.Mul {}; B.Div {} -> traverse_ (`ascribe` T.Int) op $> T.Int
+      B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {} -> traverse_ (`ascribe` T.Float) op $> T.Float
+      B.Tuple tys -> pure (T.Tuple . map typeof $ tys)
+      B.Array size initial -> do
         size `ascribe` T.Int
         pure $ T.Array (typeof initial)
-      P.Get arr idx -> do
+      B.Get arr idx -> do
         t <- freshTy
         arr `ascribe` T.Array t
         idx `ascribe` T.Int
         pure t
-      P.Put arr idx val -> do
+      B.Put arr idx val -> do
         arr `ascribe` T.Array (typeof val)
         idx `ascribe` T.Int
         pure T.Unit

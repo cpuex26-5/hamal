@@ -1,5 +1,6 @@
 module Frontend.Syntax (ExpF (..), Binder (..), FunBind (..), Parsed, Typed) where
 
+import Basic (Cmp, PrimOp)
 import Control.Comonad.Cofree (Cofree (..))
 import Data.Bifunctor.TH (deriveBifoldable, deriveBifunctor, deriveBitraversable)
 import Data.Functor.Classes (Show1)
@@ -7,7 +8,6 @@ import Frontend.SrcSpan (SrcSpan)
 import GHC.Generics (Generic1)
 import Generic.Data (Generically1 (..))
 import Name (Symbol)
-import PrimOp (Cmp, PrimOp)
 import Type (Type)
 
 data Binder t = Binder {name :: Symbol, ty :: t}

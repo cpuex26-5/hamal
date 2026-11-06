@@ -1,6 +1,7 @@
 module Backend.Riscv.Emit (emit) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
+import Basic (Cmp (..))
 import Buildable (Buildable (build))
 import Data.ByteString.Builder qualified as BB
 import Data.Map qualified as M
@@ -8,7 +9,6 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
 import Name (Fresh, Id, Label (..), fresh)
-import PrimOp (Cmp (..))
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 

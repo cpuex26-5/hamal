@@ -1,5 +1,6 @@
 module Middleend.KNormal (Exp (..), Binder (..), FunBind (..), kNormal) where
 
+import Basic (Cmp (..), PrimOp (..))
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree (..))
 import Control.Monad.Trans.Class (lift)
@@ -10,7 +11,6 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Frontend.Syntax qualified as S
 import Name (Fresh, Id, Symbol, fresh)
-import PrimOp (Cmp (..), PrimOp (..))
 import Type (Type)
 import Type qualified as T
 

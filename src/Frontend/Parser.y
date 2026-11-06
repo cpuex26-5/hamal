@@ -1,6 +1,7 @@
 {
 module Frontend.Parser (parse) where
 
+import Basic
 import Control.Comonad (extract)
 import Control.Comonad.Cofree
 import Data.Foldable1
@@ -10,7 +11,6 @@ import Frontend.SrcSpan
 import Frontend.Syntax
 import Frontend.Token
 import Name
-import PrimOp
 }
 
 %name parse

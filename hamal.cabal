@@ -53,6 +53,7 @@ library
     Backend.Riscv.Emit
     Backend.Riscv.RegAlloc
     Backend.Riscv.Virtual
+    Basic
     Buildable
     Frontend.Lexer
     Frontend.Parser
@@ -66,7 +67,6 @@ library
     Middleend.Opt.Assoc
     Middleend.Opt.Beta
     Name
-    PrimOp
     Type
 
   build-tool-depends:
