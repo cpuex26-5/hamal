@@ -1,5 +1,6 @@
 module Frontend.Typing (TypeError (..), typing) where
 
+import Basic (Binder (..), FunBind (..))
 import Basic qualified as B
 import Control.Comonad (Comonad (extract))
 import Control.Comonad.Cofree (Cofree (..))
@@ -95,23 +96,23 @@ infer (sspan :< expr) = case expr of
     cnd' `ascribe` T.Bool
     thn' `ascribe` typeof els'
     pure $ (sspan, typeof thn') :< S.If cnd' thn' els'
-  S.Let S.Binder {name} rhs body -> do
+  S.Let Binder {name} rhs body -> do
     rhs' <- infer rhs
     let ty = typeof rhs'
-    withBinders [S.Binder {name, ty}] do
+    withBinders [Binder {name, ty}] do
       body' <- infer body
-      pure $ (sspan, typeof body') :< S.Let S.Binder {name, ty} rhs' body'
-  S.LetRec S.FunBind {binder = S.Binder {name}, args, rhs} body -> do
+      pure $ (sspan, typeof body') :< S.Let Binder {name, ty} rhs' body'
+  S.LetRec FunBind {binder = Binder {name}, args, rhs} body -> do
     ret <- freshTy
     args' <- traverse annotate args
-    let binder = S.Binder {name, ty = T.Fun ((.ty) <$> args') ret}
+    let binder = Binder {name, ty = T.Fun ((.ty) <$> args') ret}
     rhs' <- withBinders (binder : args') do
       rhs' <- infer rhs
       rhs' `ascribe` ret
       pure rhs'
     withBinders [binder] do
       body' <- infer body
-      pure $ (sspan, typeof body') :< S.LetRec S.FunBind {binder, args = args', rhs = rhs'} body'
+      pure $ (sspan, typeof body') :< S.LetRec FunBind {binder, args = args', rhs = rhs'} body'
   S.LetTuple binders rhs body -> do
     binders' <- traverse annotate binders
     rhs' <- infer rhs
@@ -126,7 +127,7 @@ infer (sspan :< expr) = case expr of
     fun' `ascribe` T.Fun (typeof <$> params') ty
     pure $ (sspan, ty) :< S.App fun' params'
   where
-    withBinders binders = local (M.union $ M.fromList [(name, ty) | S.Binder {name, ty} <- binders])
+    withBinders binders = local (M.union $ M.fromList [(name, ty) | Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
       B.Neg {}; B.Add {}; B.Sub {}; B.Mul {}; B.Div {} -> traverse_ (`ascribe` T.Int) op $> T.Int

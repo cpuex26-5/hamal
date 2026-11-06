@@ -111,7 +111,7 @@ simple_expr :: { Parsed }
   | ident                         { $1.span :< Var $1.value }
   | simple_expr '.' '(' expr ')'  { extract $1 <> $5 :< PrimOp (Get $1 $4) }
 
-funbind :: { FunBind (Binder ()) Parsed }
+funbind :: { FunBind (Binder Symbol ()) Parsed }
   : ident arguments '=' expr { FunBind (binder $1.value) (binder <\$> $2) $4 }
 
 arguments :: { [Symbol] }
@@ -131,7 +131,7 @@ pattern :: { [Symbol] }
   | ident   ',' ident { [$1.value, $3.value] }
 
 {
-binder :: Symbol -> Binder ()
+binder :: Symbol -> Binder Symbol ()
 binder name = Binder { name, ty = () }
 
 parseError :: Located Token -> Alex a
