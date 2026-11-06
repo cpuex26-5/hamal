@@ -28,7 +28,6 @@ data ExpF t r
   | LetRec (FunBind (Binder t) r) r
   | LetTuple [Binder t] r r
   | App r [r]
-  | Array r r
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 (ExpF t)
 
@@ -38,7 +37,7 @@ data FunBind b r = FunBind {binder :: b, args :: [b], rhs :: r}
 
 type Parsed = Cofree (ExpF ()) SrcSpan
 
-type Typed = Cofree (ExpF Type) SrcSpan
+type Typed = Cofree (ExpF Type) (SrcSpan, Type)
 
 deriveBifunctor ''FunBind
 deriveBifoldable ''FunBind

@@ -1,4 +1,4 @@
-module Name (Symbol, Id, Label (..), Fresh, fresh, refresh, runFresh, freshI, wrap) where
+module Name (Symbol, Id, Label (..), Fresh, fresh, refresh, runFresh, freshI) where
 
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec, shortByteString)
@@ -27,10 +27,6 @@ data Fresh :: Effect
 type instance DispatchOf Fresh = Static NoSideEffects
 
 newtype instance StaticRep Fresh = Counter Int
-
--- TODO: remove this
-wrap :: Symbol -> Id
-wrap hint = Id {unique = 0, hint}
 
 runFresh :: Eff (Fresh : es) a -> Eff es a
 runFresh = evalStaticRep (Counter 1)

@@ -63,7 +63,6 @@ library
     Hamal
     Middleend.Closure
     Middleend.KNormal
-    Middleend.Opt.Alpha
     Middleend.Opt.Assoc
     Middleend.Opt.Beta
     Name

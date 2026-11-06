@@ -3,7 +3,7 @@ module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), clo
 import Data.Set qualified as S
 import Effectful (Eff, runPureEff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
-import Middleend.KNormal (FunBind (FunBind))
+import Middleend.KNormal (FunBind (..))
 import Middleend.KNormal qualified as K
 import Name (Id, Label (Local))
 import PrimOp (Cmp, PrimOp)
@@ -51,14 +51,14 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
       K.Var ident -> pure $ Var ident
       K.PrimOp op -> pure $ PrimOp op
       K.If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
-      K.Let binder rhs body -> Let binder <$> go rhs <*> go body
-      K.LetRec FunBind {name, args, rhs} body -> do
+      K.Let binder rhs body -> Let binder.name <$> go rhs <*> go body
+      K.LetRec FunBind {binder, args, rhs} body -> do
         rhs' <- go rhs
-        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ name : args)
+        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList . map (.name) $ binder : args)
         body' <- go body
-        output $ FunDef {name = Local name, args, formalFv = fv, rhs = rhs'}
+        output $ FunDef {name = Local binder.name, args = (.name) <$> args, formalFv = fv, rhs = rhs'}
         pure body'
-      K.LetTuple binders rhs body -> LetTuple binders rhs <$> go body
+      K.LetTuple binders rhs body -> LetTuple ((.name) <$> binders) rhs <$> go body
       K.App fun params -> pure $ AppDir (Local fun) params
 
     freeVars = \case
@@ -67,7 +67,5 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
       PrimOp op -> foldMap S.singleton op
       If _ lhs rhs thn els -> S.fromList [lhs, rhs] <> freeVars thn <> freeVars els
       Let binder rhs body -> S.difference (freeVars rhs <> freeVars body) $ S.singleton binder
-      -- MakeCls binder Closure {actualFv} body -> S.delete binder $ S.fromList actualFv <> freeVars body
-      -- AppCls fun params -> S.fromList $ fun : params
       AppDir _ params -> S.fromList params
       LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList binders

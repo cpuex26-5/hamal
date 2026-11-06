@@ -99,7 +99,7 @@ expr :: { Parsed }
   | let '(' pattern ')' '=' expr in expr { $1 <> extract $8 :< LetTuple (binder <\$> $3) $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { extract $1 <> extract $7 :< PrimOp (Put $1 $4 $7) }
   | expr ';' expr { extract $1 <> extract $3 :< Let (binder "_") $1 $3 }
-  | arraycreate simple_expr simple_expr %prec prec_app { $1 <> extract $3 :< Array $2 $3 }
+  | arraycreate simple_expr simple_expr %prec prec_app { $1 <> extract $3 :< PrimOp (Array $2 $3) }
 
 
 simple_expr :: { Parsed }

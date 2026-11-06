@@ -18,7 +18,6 @@ import Middleend.Closure (closureConvert)
 import Middleend.Closure qualified as C
 import Middleend.KNormal (kNormal)
 import Middleend.KNormal qualified as K
-import Middleend.Opt.Alpha (alphaConvert)
 import Middleend.Opt.Assoc (assocLet)
 import Middleend.Opt.Beta (betaConvert)
 import Name (Id, runFresh)
@@ -27,7 +26,6 @@ data Phase
   = Parsed
   | Typed
   | KNormal
-  | Alpha
   | Beta
   | Assoc
   | Closure
@@ -39,7 +37,6 @@ data Stage a where
   SParsed :: Stage Parsed
   STyped :: Stage Typed
   SKNormal :: Stage K.Exp
-  SAlpha :: Stage K.Exp
   SBeta :: Stage K.Exp
   SAssoc :: Stage K.Exp
   SClosure :: Stage C.Program
@@ -51,7 +48,6 @@ phase = \case
   SParsed -> Parsed
   STyped -> Typed
   SKNormal -> KNormal
-  SAlpha -> Alpha
   SBeta -> Beta
   SAssoc -> Assoc
   SClosure -> Closure
@@ -63,7 +59,6 @@ phaseName = \case
   Parsed -> "parsed"
   Typed -> "typed"
   KNormal -> "knorm"
-  Alpha -> "alpha"
   Beta -> "beta"
   Assoc -> "assoc"
   Closure -> "closure"
@@ -87,10 +82,9 @@ stage s m = do
 compile :: (Error CompileError :> es, Inspect :> es) => ByteString -> Eff es Builder
 compile input = runFresh do
   syntax <- stage SParsed . either (throwError . ParseError) pure $ runAlex input parse
-  _typed <- stage STyped . runErrorNoCallStackWith (throwError . TypeError) $ typing syntax
-  knorm <- stage SKNormal . kNormal $ syntax
-  alpha <- stage SAlpha . alphaConvert $ knorm
-  beta <- stage SBeta . pure . betaConvert $ alpha
+  typed <- stage STyped . runErrorNoCallStackWith (throwError . TypeError) $ typing syntax
+  knorm <- stage SKNormal . kNormal $ typed
+  beta <- stage SBeta . pure . betaConvert $ knorm
   assoc <- stage SAssoc . pure . assocLet $ beta
   closure <- stage SClosure . pure . closureConvert $ assoc
   virtual <- stage SVirtual . genVirtual $ closure

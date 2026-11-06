@@ -43,8 +43,8 @@ typing parsed = do
   (inferred, subst) <- runState @Subst M.empty . runReader @Env M.empty . infer $ parsed
   resolve subst inferred
 
-typeOf :: Annotated -> Typing
-typeOf = snd . extract
+typeof :: Annotated -> Typing
+typeof = snd . extract
 
 ascribe :: (Error TypeError :> es, State Subst :> es) => Annotated -> Typing -> Eff es ()
 ascribe e expected = let (sspan, actual) = extract e in unify sspan expected actual
@@ -86,21 +86,21 @@ infer (sspan :< expr) = case expr of
     lhs' <- infer lhs
     rhs' <- infer rhs
     -- TODO: limit to int/float
-    lhs' `ascribe` typeOf rhs'
+    lhs' `ascribe` typeof rhs'
     pure $ (sspan, T.Bool) :< S.Cmp cmp lhs' rhs'
   S.If cnd thn els -> do
     cnd' <- infer cnd
     thn' <- infer thn
     els' <- infer els
     cnd' `ascribe` T.Bool
-    thn' `ascribe` typeOf els'
-    pure $ (sspan, typeOf thn') :< S.If cnd' thn' els'
+    thn' `ascribe` typeof els'
+    pure $ (sspan, typeof thn') :< S.If cnd' thn' els'
   S.Let S.Binder {name} rhs body -> do
     rhs' <- infer rhs
-    let ty = typeOf rhs'
+    let ty = typeof rhs'
     withBinders [S.Binder {name, ty}] do
       body' <- infer body
-      pure $ (sspan, typeOf body') :< S.Let S.Binder {name, ty} rhs' body'
+      pure $ (sspan, typeof body') :< S.Let S.Binder {name, ty} rhs' body'
   S.LetRec S.FunBind {binder = S.Binder {name}, args, rhs} body -> do
     ret <- freshTy
     args' <- traverse annotate args
@@ -111,47 +111,45 @@ infer (sspan :< expr) = case expr of
       pure rhs'
     withBinders [binder] do
       body' <- infer body
-      pure $ (sspan, typeOf body') :< S.LetRec S.FunBind {binder, args = args', rhs = rhs'} body'
+      pure $ (sspan, typeof body') :< S.LetRec S.FunBind {binder, args = args', rhs = rhs'} body'
   S.LetTuple binders rhs body -> do
     binders' <- traverse annotate binders
     rhs' <- infer rhs
     rhs' `ascribe` T.Tuple ((.ty) <$> binders')
     withBinders binders' do
       body' <- infer body
-      pure $ (sspan, typeOf body') :< S.LetTuple binders' rhs' body'
+      pure $ (sspan, typeof body') :< S.LetTuple binders' rhs' body'
   S.App fun params -> do
     fun' <- infer fun
     params' <- mapM infer params
     ty <- freshTy
-    fun' `ascribe` T.Fun (typeOf <$> params') ty
+    fun' `ascribe` T.Fun (typeof <$> params') ty
     pure $ (sspan, ty) :< S.App fun' params'
-  S.Array size initial -> do
-    size' <- infer size
-    initial' <- infer initial
-    size' `ascribe` T.Int
-    pure $ (sspan, T.Array (typeOf initial')) :< S.Array size' initial'
   where
     withBinders binders = local (M.union $ M.fromList [(name, ty) | S.Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
       P.Neg {}; P.Add {}; P.Sub {}; P.Mul {}; P.Div {} -> traverse_ (`ascribe` T.Int) op $> T.Int
       P.FNeg {}; P.FAdd {}; P.FSub {}; P.FMul {}; P.FDiv {} -> traverse_ (`ascribe` T.Float) op $> T.Float
-      P.Tuple tys -> pure (T.Tuple . map typeOf $ tys)
+      P.Tuple tys -> pure (T.Tuple . map typeof $ tys)
+      P.Array size initial -> do
+        size `ascribe` T.Int
+        pure $ T.Array (typeof initial)
       P.Get arr idx -> do
         t <- freshTy
         arr `ascribe` T.Array t
         idx `ascribe` T.Int
         pure t
       P.Put arr idx val -> do
-        arr `ascribe` T.Array (typeOf val)
+        arr `ascribe` T.Array (typeof val)
         idx `ascribe` T.Int
         pure T.Unit
 
 zonk :: Subst -> Typing -> Typing
 zonk s t = t >>= \v -> maybe (T.Var v) (zonk s) (M.lookup v s)
 
-resolve :: (Error TypeError :> es) => Subst -> Annotated -> Eff es S.Typed
+resolve :: forall es. (Error TypeError :> es) => Subst -> Annotated -> Eff es S.Typed
 resolve subst = go
   where
-    go ((sspan, _) :< e) = (sspan :<) <$> bitraverse (ground sspan) go e
+    go ((sspan, ty) :< e) = ((:<) . (sspan,) <$> ground sspan ty) <*> bitraverse (ground sspan) go e
     ground sspan = fmap T.Type . traverse (throwError . Ambiguous sspan) . zonk subst

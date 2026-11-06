@@ -16,6 +16,7 @@ data PrimOp a
   | FMul a a
   | FDiv a a
   | Tuple [a]
+  | Array a a
   | Get a a
   | Put a a a
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
