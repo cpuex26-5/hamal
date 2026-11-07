@@ -1,7 +1,7 @@
 module Backend.Riscv.Emit (emit) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
-import Basic (Binder (..), Cmp (..))
+import Basic (Binder (..), Cmp (..), Rel (..))
 import Buildable (Buildable (build))
 import Data.ByteString.Builder qualified as BB
 import Data.Map qualified as M
@@ -44,18 +44,23 @@ emitNonTail rd = \case
     tell ("\tla\t" <> build T0 <> ", " <> build label <> "\n")
       *> tell ("\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build T0 <> ")\n")
   Sw rd' rs offset -> tell $ "\tsw\t" <> build rd' <> ", " <> BB.intDec offset <> "(" <> build rs <> ")\n"
-  If cmp lhs rhs thn els -> do
+  If (ICmp rel) lhs rhs thn els -> do
     label_else <- Local <$> fresh "else"
     label_cont <- Local <$> fresh "cont"
-    let b = case cmp of
+    let b = case rel of
           Eq -> "bne"
+          Neq -> "beq"
+          Lt -> "bge"
           Le -> "bgt"
+          Gt -> "ble"
+          Ge -> "blt"
     tell $ "\t" <> b <> "\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
     emitBlock (NonTail rd) thn
     tell $ "\tj\t" <> build label_cont <> "\n"
     tell $ build label_else <> ":\n"
     emitBlock (NonTail rd) els
     tell $ build label_cont <> ":\n"
+  If (FCmp _rel) _lhs _rhs _thn _els -> undefined -- TODO: fcmp
   CallDir fun _ -> tell $ "\tcall\t" <> build fun <> "\n"
   Save rs ident -> do
     offset <- asks @Frame \frame -> frame.slots M.! ident

@@ -1,6 +1,6 @@
 module Middleend.KNormal (Exp (..), Binder (..), FunBind (..), kNormal) where
 
-import Basic (Binder (..), Cmp (..), FunBind (..), PrimOp (..))
+import Basic (Binder (..), Cmp (..), FunBind (..), PrimOp (..), Rel (..))
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree (..))
 import Control.Monad.Trans.Class (lift)
@@ -47,7 +47,7 @@ go expr@(_ :< t) = evalContT $ case t of
   S.Int int -> pure $ Int int
   S.Float float -> pure $ Float float
   S.Bool bol -> pure . Int $ bool 0 1 bol
-  (S.Not {}; S.Cmp {}) -> kIf expr (pure (Int 1)) (pure (Int 0))
+  S.Cmp {} -> kIf expr (pure (Int 1)) (pure (Int 0))
   S.Var sym -> Var <$> lift (asks (M.! sym))
   S.PrimOp op -> PrimOp <$> traverse atomize op
   S.If cnd thn els -> kIf cnd (go thn) (go els)
@@ -72,6 +72,5 @@ go expr@(_ :< t) = evalContT $ case t of
     bind b = ContT \k -> do
       b' <- bitraverse fresh pure b
       local (M.insert b.name b'.name) (k b')
-    kIf (_ :< S.Not c) thn els = kIf c els thn
     kIf (_ :< S.Cmp cmp lhs rhs) thn els = If cmp <$> atomize lhs <*> atomize rhs <*> lift thn <*> lift els
-    kIf cnd thn els = If Eq <$> atomize cnd <*> atom (T.Type T.Int) (pure (Int 1)) <*> lift thn <*> lift els
+    kIf cnd thn els = If (ICmp Eq) <$> atomize cnd <*> atom (T.Type T.Int) (pure (Int 1)) <*> lift thn <*> lift els

@@ -1,4 +1,4 @@
-module Basic (PrimOp (..), Cmp (..), Binder (..), FunBind (..)) where
+module Basic (PrimOp (..), Rel (..), Cmp (..), Binder (..), FunBind (..)) where
 
 import Data.Bifunctor.TH (deriveBifoldable, deriveBifunctor, deriveBitraversable)
 import Data.Functor.Classes (Show1)
@@ -6,7 +6,8 @@ import GHC.Generics (Generic1)
 import Generic.Data (Generically1 (..))
 
 data PrimOp a
-  = Neg a
+  = Not a
+  | Neg a
   | FNeg a
   | Add a a
   | Sub a a
@@ -23,7 +24,10 @@ data PrimOp a
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 PrimOp
 
-data Cmp = Eq | Le
+data Rel = Eq | Neq | Lt | Le | Gt | Ge
+  deriving stock (Show, Eq)
+
+data Cmp = ICmp Rel | FCmp Rel
   deriving stock (Show, Eq)
 
 data Binder n t = Binder {name :: n, ty :: t}

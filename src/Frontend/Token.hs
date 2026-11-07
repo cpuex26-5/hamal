@@ -35,6 +35,12 @@ data Token
   | TLe
   | TGt
   | TGe
+  | TEqDot
+  | TNeqDot
+  | TLtDot
+  | TLeDot
+  | TGtDot
+  | TGeDot
   | TLPar
   | TRPar
   | TComma

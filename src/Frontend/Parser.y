@@ -47,6 +47,12 @@ import Name
   '<='        { (symbol TLe -> Just $$) }
   '>'         { (symbol TGt -> Just $$) }
   '>='        { (symbol TGe -> Just $$) }
+  '=.'        { (symbol TEqDot -> Just $$) }
+  '<>.'       { (symbol TNeqDot -> Just $$) }
+  '<.'        { (symbol TLtDot -> Just $$) }
+  '<=.'       { (symbol TLeDot -> Just $$) }
+  '>.'        { (symbol TGtDot -> Just $$) }
+  '>=.'       { (symbol TGeDot -> Just $$) }
   '('         { (symbol TLPar -> Just $$) }
   ')'         { (symbol TRPar -> Just $$) }
   ','         { (symbol TComma -> Just $$) }
@@ -61,7 +67,7 @@ import Name
 %right '<-'
 %nonassoc prec_tuple
 %left ','
-%left '=' '<>' '<' '>' '<=' '>='
+%left '=' '<>' '<' '>' '<=' '>=' '=.' '<>.' '<.' '>.' '<=.' '>=.'
 %left '+' '-' '+.' '-.'
 %left '*' '/' '*.' '/.'
 %right prec_unary_minus
@@ -72,25 +78,35 @@ import Name
 
 expr :: { Parsed }
   : simple_expr { $1 }
-  | not expr %prec prec_app { $1 <> extract $2 :< Not $2 }
   | '-' expr %prec prec_unary_minus { case $2 of
                                         ann :< Float float -> $1 <> ann :< Float (-float)
                                         ann :< _           -> $1 <> ann :< PrimOp (Neg $2) }
   | '-.' expr %prec prec_unary_minus { $1 <> extract $2 :< PrimOp (FNeg $2) }
+
   | expr '+'  expr { extract $1 <> extract $3 :< PrimOp (Add $1 $3) }
   | expr '-'  expr { extract $1 <> extract $3 :< PrimOp (Sub $1 $3) }
   | expr '*'  expr { extract $1 <> extract $3 :< PrimOp (Mul $1 $3) }
   | expr '/'  expr { extract $1 <> extract $3 :< PrimOp (Div $1 $3) }
+
   | expr '+.' expr { extract $1 <> extract $3 :< PrimOp (FAdd $1 $3) }
   | expr '-.' expr { extract $1 <> extract $3 :< PrimOp (FSub $1 $3) }
   | expr '*.' expr { extract $1 <> extract $3 :< PrimOp (FMul $1 $3) }
   | expr '/.' expr { extract $1 <> extract $3 :< PrimOp (FDiv $1 $3) }
-  | expr '='  expr { extract $1 <> extract $3 :< Cmp Eq $1 $3 }
-  | expr '<=' expr { extract $1 <> extract $3 :< Cmp Le $1 $3 }
-  | expr '>=' expr { extract $1 <> extract $3 :< Cmp Le $3 $1 }
-  | expr '<>' expr { extract $1 <> extract $3 :< Not (extract $1 <> extract $3 :< Cmp Eq $1 $3) }
-  | expr '<'  expr { extract $1 <> extract $3 :< Not (extract $1 <> extract $3 :< Cmp Le $3 $1) }
-  | expr '>'  expr { extract $1 <> extract $3 :< Not (extract $1 <> extract $3 :< Cmp Le $1 $3) }
+
+  | expr '='  expr { extract $1 <> extract $3 :< Cmp (ICmp Eq ) $1 $3 }
+  | expr '<>' expr { extract $1 <> extract $3 :< Cmp (ICmp Neq) $1 $3 }
+  | expr '<'  expr { extract $1 <> extract $3 :< Cmp (ICmp Lt ) $1 $3 }
+  | expr '<=' expr { extract $1 <> extract $3 :< Cmp (ICmp Le ) $1 $3 }
+  | expr '>'  expr { extract $1 <> extract $3 :< Cmp (ICmp Gt ) $1 $3 }
+  | expr '>=' expr { extract $1 <> extract $3 :< Cmp (ICmp Ge ) $1 $3 }
+
+  | expr '=.'  expr { extract $1 <> extract $3 :< Cmp (FCmp Eq ) $1 $3 }
+  | expr '<>.' expr { extract $1 <> extract $3 :< Cmp (FCmp Neq) $1 $3 }
+  | expr '<.'  expr { extract $1 <> extract $3 :< Cmp (FCmp Lt ) $1 $3 }
+  | expr '<=.' expr { extract $1 <> extract $3 :< Cmp (FCmp Le ) $1 $3 }
+  | expr '>.'  expr { extract $1 <> extract $3 :< Cmp (FCmp Gt ) $1 $3 }
+  | expr '>=.' expr { extract $1 <> extract $3 :< Cmp (FCmp Ge ) $1 $3 }
+
   | if expr then expr else expr %prec prec_if { $1 <> extract $6 :< If $2 $4 $6 }
   | let ident '=' expr in expr %prec prec_let { $1 <> extract $6 :< Let (binder $2.value) $4 $6 }
   | let rec funbind in expr    %prec prec_let { $1 <> extract $5 :< LetRec $3 $5 }
@@ -99,8 +115,9 @@ expr :: { Parsed }
   | let '(' pattern ')' '=' expr in expr { $1 <> extract $8 :< LetTuple (binder <\$> $3) $6 $8 }
   | simple_expr '.' '(' expr ')' '<-' expr { extract $1 <> extract $7 :< PrimOp (Put $1 $4 $7) }
   | expr ';' expr { extract $1 <> extract $3 :< Let (binder "_") $1 $3 }
+  
+  | not expr %prec prec_app { $1 <> extract $2 :< PrimOp (Not $2) }
   | arraycreate simple_expr simple_expr %prec prec_app { $1 <> extract $3 :< PrimOp (Array $2 $3) }
-
 
 simple_expr :: { Parsed }
   : '(' expr ')'                  { $2 }

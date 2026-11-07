@@ -17,7 +17,6 @@ data ExpF t r
   | Float Float
   | Var Symbol
   | PrimOp (PrimOp r)
-  | Not r
   | Cmp Cmp r r
   | If r r r
   | Let (Binder Symbol t) r r

@@ -1,6 +1,6 @@
 module Frontend.Typing (TypeError (..), typing) where
 
-import Basic (Binder (..), FunBind (..))
+import Basic (Binder (..), Cmp (..), FunBind (..))
 import Basic qualified as B
 import Control.Comonad (Comonad (extract))
 import Control.Comonad.Cofree (Cofree (..))
@@ -79,15 +79,12 @@ infer (sspan :< expr) = case expr of
     op' <- traverse infer op
     ty <- inferPrim op'
     pure $ (sspan, ty) :< S.PrimOp op'
-  S.Not e -> do
-    e' <- infer e
-    e' `ascribe` T.Bool
-    pure $ (sspan, T.Bool) :< S.Not e'
   S.Cmp cmp lhs rhs -> do
     lhs' <- infer lhs
     rhs' <- infer rhs
-    -- TODO: limit to int/float
-    lhs' `ascribe` typeof rhs'
+    case cmp of
+      ICmp {} -> lhs' `ascribe` T.Int *> rhs' `ascribe` T.Int
+      FCmp {} -> lhs' `ascribe` T.Float *> rhs' `ascribe` T.Float
     pure $ (sspan, T.Bool) :< S.Cmp cmp lhs' rhs'
   S.If cnd thn els -> do
     cnd' <- infer cnd
@@ -130,6 +127,7 @@ infer (sspan :< expr) = case expr of
     withBinders binders = local (M.union $ M.fromList [(name, ty) | Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
+      B.Not ty -> ty `ascribe` T.Bool $> T.Bool
       B.Neg {}; B.Add {}; B.Sub {}; B.Mul {}; B.Div {} -> traverse_ (`ascribe` T.Int) op $> T.Int
       B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {} -> traverse_ (`ascribe` T.Float) op $> T.Float
       B.Tuple tys -> pure (T.Tuple . map typeof $ tys)

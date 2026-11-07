@@ -64,6 +64,12 @@ tokens :-
 <0> "<="                                        { tok TLe }
 <0> ">"                                         { tok TGt }
 <0> ">="                                        { tok TGe }
+<0> "=."                                        { tok TEqDot }
+<0> "<>."                                       { tok TNeqDot }
+<0> "<."                                        { tok TLtDot }
+<0> "<=."                                       { tok TLeDot }
+<0> ">."                                        { tok TGtDot }
+<0> ">=."                                       { tok TGeDot }
 
 <0> "("                                         { tok TLPar }
 <0> ")"                                         { tok TRPar }
