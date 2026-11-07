@@ -64,14 +64,14 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . runReader (M.
       K.Var ident -> pure $ Var ident
       K.PrimOp op -> pure $ PrimOp op
       K.If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
-      K.Let binder rhs body -> Let binder <$> go rhs <*> local (withB binder) (go body)
+      K.Let binder rhs body -> Let binder <$> go rhs <*> local (with binder) (go body)
       K.LetRec FunBind {binder, args, rhs} body -> do
-        rhs' <- local (foldMap withB (binder : args)) (go rhs)
+        rhs' <- local (foldMap with (binder : args)) (go rhs)
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : args)
-        body' <- local (withB binder) (go body)
-        formalFv <- asks (\env -> (\name -> Binder {name, ty = env ! name}) <$> fv)
+        body' <- local (with binder) (go body)
+        formalFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable)" <> show name) name env}) <$> fv)
         output $ FunDef {binder = first Local binder, args, formalFv, rhs = rhs'}
         pure body'
-      K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap withB binders) (go body)
+      K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap with binders) (go body)
       K.App fun params -> pure $ AppDir (Local fun) params
-    withB binder = M.insert binder.name binder.ty
+    with binder = M.insert binder.name binder.ty

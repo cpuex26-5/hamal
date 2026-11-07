@@ -11,7 +11,8 @@ data PrimOp a
   | FNeg a
   | Add a a
   | Sub a a
-  | Mul a a
+  | -- TODO: 始めから parse 時に shift にしておく
+    Mul a a
   | Div a a
   | FAdd a a
   | FSub a a

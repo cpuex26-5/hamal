@@ -63,10 +63,10 @@ emitNonTail rd = \case
   If (FCmp _rel) _lhs _rhs _thn _els -> undefined -- TODO: fcmp
   CallDir fun _ -> tell $ "\tcall\t" <> build fun <> "\n"
   Save rs ident -> do
-    offset <- asks @Frame \frame -> frame.slots M.! ident
+    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
     tell $ "\tsw\t" <> build rs <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
   Restore ident -> do
-    offset <- asks @Frame \frame -> frame.slots M.! ident
+    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
     tell $ "\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
 
 emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest -> Block Reg -> Eff es ()

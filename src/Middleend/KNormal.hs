@@ -48,7 +48,7 @@ go expr@(_ :< t) = evalContT $ case t of
   S.Float float -> pure $ Float float
   S.Bool bol -> pure . Int $ bool 0 1 bol
   S.Cmp {} -> kIf expr (pure (Int 1)) (pure (Int 0))
-  S.Var sym -> Var <$> lift (asks (M.! sym))
+  S.Var sym -> Var <$> lift (asks (M.findWithDefault (error "kNormal(unreachable)") sym))
   S.PrimOp op -> PrimOp <$> traverse atomize op
   S.If cnd thn els -> kIf cnd (go thn) (go els)
   S.Let binder rhs body -> do
