@@ -2,20 +2,31 @@ module Name (Symbol, Id, Label (..), Fresh, fresh, refresh, runFresh, freshI) wh
 
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec, shortByteString)
+import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Short (ShortByteString)
+import Data.ByteString.Short qualified as SBS
 import Effectful (Dispatch (..), DispatchOf, Eff, Effect, (:>))
 import Effectful.Dispatch.Static (SideEffects (..), StaticRep, evalStaticRep, stateStaticRep)
+import Prettyprinter (Pretty (..))
 
 type Symbol = ShortByteString
 
 data Id = Id {unique :: Int, hint :: ShortByteString}
   deriving stock (Eq, Ord)
 
+instance Show Id where
+  show Id {unique, hint} = show hint <> "." <> show unique
+
+instance Pretty Id where
+  pretty Id {unique, hint} = pretty (BS8.unpack (SBS.fromShort hint)) <> "." <> pretty unique
+
 data Label = Local Id | Global Symbol
   deriving stock (Show, Eq)
 
-instance Show Id where
-  show Id {unique, hint} = show hint <> "." <> show unique
+instance Pretty Label where
+  pretty = \case
+    Local ident -> pretty ident
+    Global sym -> pretty (BS8.unpack (SBS.fromShort sym))
 
 instance Buildable Label where
   build = \case

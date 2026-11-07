@@ -82,6 +82,7 @@ library
     effectful-core,
     free,
     generic-data,
+    prettyprinter,
     transformers,
 
   hs-source-dirs: src

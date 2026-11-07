@@ -12,6 +12,7 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Frontend.Syntax qualified as S
 import Name (Fresh, Id, Symbol, fresh)
+import Prettyprinter (Pretty (..), group, hardline, hsep, line, nest, parens, tupled, (<+>))
 import Type (Type)
 import Type qualified as T
 
@@ -27,6 +28,27 @@ data Exp
   | LetTuple [Binder Id Type] Id Exp
   | App Id [Id]
   deriving stock (Show, Eq)
+
+instance Pretty Exp where
+  pretty = \case
+    Unit -> "()"
+    Int int -> pretty int
+    Float float -> pretty float
+    Var ident -> pretty ident
+    PrimOp op -> pretty op
+    If cmp lhs rhs thn els ->
+      group $
+        nest 2 ("if" <+> pretty lhs <+> pretty cmp <+> pretty rhs <+> "then" <+> line <> pretty thn)
+          <> line
+          <> nest 2 ("else" <> line <> pretty els)
+    Let binder rhs body ->
+      group (nest 2 ("let" <+> pretty binder <+> "=" <> line <> pretty rhs) <> line <> "in")
+        <> hardline
+        <> pretty body
+    LetRec FunBind {binder, args, rhs} body ->
+      nest 2 ("let rec" <+> pretty binder.name <+> hsep (parens . pretty <$> args) <+> "=" <> line <> pretty rhs) <> hardline <> "in" <> hardline <> pretty body
+    LetTuple binders rhs body -> "let" <+> tupled (pretty <$> binders) <+> "=" <+> pretty rhs <+> "in" <> hardline <> pretty body
+    App fun params -> hsep (pretty fun : (pretty <$> params))
 
 insertLet :: (Fresh :> es) => Type -> Eff es Exp -> (Id -> Eff es Exp) -> Eff es Exp
 insertLet ty scrutM k = do
