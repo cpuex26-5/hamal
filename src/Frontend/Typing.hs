@@ -1,13 +1,15 @@
 module Frontend.Typing (TypeError (..), typing) where
 
-import Basic (Binder (..), Cmp (..), FunBind (..))
+import Basic (Binder (..), Cmp (..), FunBind (..), PrimOp (..))
 import Basic qualified as B
 import Control.Comonad (Comonad (extract))
 import Control.Comonad.Cofree (Cofree (..))
 import Control.Monad (when, zipWithM_)
+import Control.Monad.Trans.State.Strict (StateT (..))
 import Data.Bitraversable (Bitraversable (bitraverse))
 import Data.Foldable (traverse_)
 import Data.Functor (($>))
+import Data.List (uncons)
 import Data.Map qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Error.Static (Error, throwError)
@@ -23,6 +25,7 @@ data TypeError
   | Recursive SrcSpan TyVar Typing
   | UnknownSymbol SrcSpan Symbol
   | Ambiguous SrcSpan TyVar
+  | BuiltinArity SrcSpan Symbol Int Int
   deriving stock (Show, Eq)
 
 newtype TyVar = TyVar Int
@@ -96,35 +99,40 @@ infer (sspan :< expr) = case expr of
   S.Let Binder {name} rhs body -> do
     rhs' <- infer rhs
     let ty = typeof rhs'
-    withBinders [Binder {name, ty}] do
+    with [Binder {name, ty}] do
       body' <- infer body
       pure $ (sspan, typeof body') :< S.Let Binder {name, ty} rhs' body'
   S.LetRec FunBind {binder = Binder {name}, args, rhs} body -> do
     ret <- freshTy
     args' <- traverse annotate args
     let binder = Binder {name, ty = T.Fun ((.ty) <$> args') ret}
-    rhs' <- withBinders (binder : args') do
+    rhs' <- with (binder : args') do
       rhs' <- infer rhs
       rhs' `ascribe` ret
       pure rhs'
-    withBinders [binder] do
+    with [binder] do
       body' <- infer body
       pure $ (sspan, typeof body') :< S.LetRec FunBind {binder, args = args', rhs = rhs'} body'
   S.LetTuple binders rhs body -> do
     binders' <- traverse annotate binders
     rhs' <- infer rhs
     rhs' `ascribe` T.Tuple ((.ty) <$> binders')
-    withBinders binders' do
+    with binders' do
       body' <- infer body
       pure $ (sspan, typeof body') :< S.LetTuple binders' rhs' body'
-  S.App fun params -> do
-    fun' <- infer fun
-    params' <- mapM infer params
-    ty <- freshTy
-    fun' `ascribe` T.Fun (typeof <$> params') ty
-    pure $ (sspan, ty) :< S.App fun' params'
+  S.App fun@(_ :< S.Var sym) params -> do
+    bound <- asks @Env (M.member sym)
+    case lookup sym builtins of
+      Just shape
+        | not bound ->
+            maybe
+              (throwError (BuiltinArity sspan sym (length shape) (length params)))
+              (infer . (sspan :<) . S.PrimOp)
+              (fill shape params)
+      _ -> inferApp fun params
+  S.App fun params -> inferApp fun params
   where
-    withBinders binders = local (M.union $ M.fromList [(name, ty) | Binder {name, ty} <- binders])
+    with binders = local (M.union $ M.fromList [(name, ty) | Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
       B.Not ty -> ty `ascribe` T.Bool $> T.Bool
@@ -143,6 +151,20 @@ infer (sspan :< expr) = case expr of
         arr `ascribe` T.Array (typeof val)
         idx `ascribe` T.Int
         pure T.Unit
+    inferApp fun params = do
+      fun' <- infer fun
+      params' <- mapM infer params
+      ty <- freshTy
+      fun' `ascribe` T.Fun (typeof <$> params') ty
+      pure $ (sspan, ty) :< S.App fun' params'
+    builtins =
+      [ ("not", Not ())
+      , ("Array.create", Array () ())
+      , ("Array.make", Array () ())
+      ]
+    fill shape xs = case runStateT (traverse (const (StateT uncons)) shape) xs of
+      Just (filled, []) -> Just filled
+      _ -> Nothing
 
 zonk :: Subst -> Typing -> Typing
 zonk s t = t >>= \v -> maybe (T.Var v) (zonk s) (M.lookup v s)

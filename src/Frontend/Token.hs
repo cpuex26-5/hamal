@@ -19,8 +19,6 @@ data Token
   | TIf
   | TThen
   | TElse
-  | TNot
-  | TArrayCreate
   | TPlus
   | TMinus
   | TTimes
