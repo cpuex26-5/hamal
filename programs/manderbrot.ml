@@ -1,5 +1,3 @@
-let rec float_of_int _ = 1. in
-let rec print_int x = () in
 let rec dbl f = f +. f in
 let rec yloop y =
   if y >= 400
@@ -13,7 +11,7 @@ let rec yloop y =
         let ci = (dbl (float_of_int y) /. 400.0) -. 1.0 in
         let rec iloop i zr zi zr2 zi2 cr ci =
           if i = 0
-          then print_int 1
+          then print_char 32 (* ' ' *)
           else (
             let tr = zr2 -. zi2 +. cr in
             let ti = (dbl zr *. zi) +. ci in
@@ -21,8 +19,8 @@ let rec yloop y =
             let zi = ti in
             let zr2 = zr *. zr in
             let zi2 = zi *. zi in
-            if zr2 +. zi2 > 2.0 *. 2.0
-            then print_int 0
+            if zr2 +. zi2 >. 2.0 *. 2.0
+            then print_char 42 (* '*' *)
             else iloop (i - 1) zr zi zr2 zi2 cr ci)
         in
         iloop 1000 0.0 0.0 0.0 0.0 cr ci;
