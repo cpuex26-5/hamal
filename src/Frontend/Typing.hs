@@ -151,6 +151,9 @@ infer (sspan :< expr) = case expr of
         arr `ascribe` T.Array (typeof val)
         idx `ascribe` T.Int
         pure T.Unit
+      B.FloatOfInt ty -> ty `ascribe` T.Int $> T.Float
+      B.IntOfFloat ty -> ty `ascribe` T.Float $> T.Int
+      B.Out ty -> ty `ascribe` T.Int $> T.Unit
     inferApp fun params = do
       fun' <- infer fun
       params' <- mapM infer params
@@ -161,6 +164,9 @@ infer (sspan :< expr) = case expr of
       [ ("not", Not ())
       , ("Array.create", Array () ())
       , ("Array.make", Array () ())
+      , ("float_of_int", FloatOfInt ())
+      , ("int_of_float", IntOfFloat ())
+      , ("print_char", Out ())
       ]
     fill shape xs = case runStateT (traverse (const (StateT uncons)) shape) xs of
       Just (filled, []) -> Just filled

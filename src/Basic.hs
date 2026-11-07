@@ -21,6 +21,9 @@ data PrimOp a
   | Array a a
   | Get a a
   | Put a a a
+  | FloatOfInt a
+  | IntOfFloat a
+  | Out a
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 PrimOp
 
