@@ -3,12 +3,18 @@ module Options (Options (..), optionsP) where
 import Control.Applicative (asum, many)
 import Data.Set qualified as S
 import Hamal (Phase, phaseName)
-import Options.Applicative (Parser, flag', help, long)
+import Options.Applicative (Parser, flag', help, long, short, switch)
 
-newtype Options = Options {dumps :: S.Set Phase}
+data Options = Options
+  { verbose :: Bool
+  , dumps :: S.Set Phase
+  }
 
 optionsP :: Parser Options
-optionsP = Options <$> dumpsP
+optionsP = Options <$> verboseP <*> dumpsP
+
+verboseP :: Parser Bool
+verboseP = switch $ short 'v' <> long "verbose" <> help "show log"
 
 dumpsP :: Parser (S.Set Phase)
 dumpsP = S.fromList . concat <$> many (asum (allP : (phaseP <$> [minBound ..])))

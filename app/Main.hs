@@ -10,6 +10,7 @@ import Effectful.Dispatch.Dynamic (interpret_)
 import Effectful.Error.Static (runErrorNoCallStack)
 import GHC.IO.StdHandles (stderr, stdout)
 import Hamal (CompileError (..), Inspect (..), Stage (..), compile, phase, phaseName)
+import Log (runLog)
 import Options (Options (..), optionsP)
 import Options.Applicative (execParser, fullDesc, helper, info, progDesc)
 import Options.Applicative.Help (LayoutOptions (LayoutOptions), PageWidth (AvailablePerLine), Pretty (pretty), hardline, layoutPretty, renderIO)
@@ -39,7 +40,7 @@ main :: IO ()
 main = do
   opts <- execParser $ info (optionsP <**> helper) (fullDesc <> progDesc "Hamal: A MinCaml compiler writtern in Haskell.")
   input <- BS.getContents
-  m <- runEff . runErrorNoCallStack @CompileError . runInspect opts . compile $ input
+  m <- runEff . runErrorNoCallStack @CompileError . runInspect opts . runLog opts.verbose . compile $ input
   case m of
     Left (ParseError msg) -> hPutStrLn stderr msg >> exitFailure
     Left (TypeError typeError) -> hPrint stderr typeError >> exitFailure

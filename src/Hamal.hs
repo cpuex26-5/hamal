@@ -14,6 +14,7 @@ import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
 import Frontend.Syntax (Parsed, Typed)
 import Frontend.Typing (TypeError, typing)
+import Log (Log)
 import Middleend.Closure (closureConvert)
 import Middleend.Closure qualified as C
 import Middleend.KNormal (kNormal)
@@ -79,12 +80,12 @@ stage s m = do
   send (Inspect s x)
   pure x
 
-compile :: (Error CompileError :> es, Inspect :> es) => ByteString -> Eff es Builder
+compile :: (Error CompileError :> es, Inspect :> es, Log :> es) => ByteString -> Eff es Builder
 compile input = runFresh do
   syntax <- stage SParsed . either (throwError . ParseError) pure $ runAlex input parse
   typed <- stage STyped . runErrorNoCallStackWith (throwError . TypeError) $ typing syntax
   knorm <- stage SKNormal . kNormal $ typed
-  beta <- stage SBeta . pure . betaConvert $ knorm
+  beta <- stage SBeta . betaConvert $ knorm
   assoc <- stage SAssoc . pure . assocLet $ beta
   closure <- stage SClosure . pure . closureConvert $ assoc
   virtual <- stage SVirtual . genVirtual $ closure

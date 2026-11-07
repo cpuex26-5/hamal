@@ -62,6 +62,7 @@ library
     Frontend.Token
     Frontend.Typing
     Hamal
+    Log
     Middleend.Closure
     Middleend.KNormal
     Middleend.Opt.Assoc
