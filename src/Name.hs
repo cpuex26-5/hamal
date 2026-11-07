@@ -15,7 +15,7 @@ data Id = Id {unique :: Int, hint :: ShortByteString}
   deriving stock (Eq, Ord)
 
 instance Show Id where
-  show Id {unique, hint} = show hint <> "." <> show unique
+  show Id {unique, hint} = BS8.unpack (SBS.fromShort hint) <> "." <> show unique
 
 instance Pretty Id where
   pretty Id {unique, hint} = pretty (BS8.unpack (SBS.fromShort hint)) <> "." <> pretty unique

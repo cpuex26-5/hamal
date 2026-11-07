@@ -2,26 +2,30 @@ module Middleend.Opt.Beta (betaConvert) where
 
 import Data.Map qualified as M
 import Effectful (Eff, (:>))
+import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Log (Log, logMsg)
 import Middleend.KNormal (Binder (..), Exp (..))
 import Name (Id)
 
-betaConvert :: forall es. (Log :> es) => Exp -> Eff es Exp
-betaConvert = go M.empty
+type Env = M.Map Id Id
+
+betaConvert :: (Log :> es) => Exp -> Eff es Exp
+betaConvert = runReader (M.empty :: Env) . go
   where
-    go :: M.Map Id Id -> Exp -> Eff es Exp
-    go env = \case
+    go :: (Log :> es, Reader Env :> es) => Exp -> Eff es Exp
+    go = \case
       e@(Unit; Int _; Float _) -> pure e
-      PrimOp op -> pure $ PrimOp (resolve <$> op)
-      If cmp lhs rhs thn els -> If cmp (resolve lhs) (resolve rhs) <$> go env thn <*> go env els
-      Let binder rhs body -> case rhs of
-        Var bound -> do
-          logMsg ("beta reduction: " <> show bound <> " -> " <> show binder.name)
-          go (M.insert bound binder.name env) body
-        _ -> Let binder rhs <$> go env body
-      Var ident -> pure . Var . resolve $ ident
-      LetRec funbind body -> LetRec <$> traverse (go env) funbind <*> go env body
-      App fun params -> pure $ App (resolve fun) (resolve <$> params)
-      LetTuple binders rhs body -> LetTuple binders rhs <$> go env body
+      PrimOp op -> PrimOp <$> traverse beta op
+      If cmp lhs rhs thn els -> If cmp <$> beta lhs <*> beta rhs <*> go thn <*> go els
+      Let binder rhs body ->
+        go rhs >>= \case
+          Var bound -> do
+            logMsg ("beta reduction: " <> show binder.name <> " -> " <> show bound)
+            local (M.insert binder.name bound) (go body)
+          rhs' -> Let binder rhs' <$> go body
+      Var ident -> Var <$> beta ident
+      LetRec funbind body -> LetRec <$> traverse go funbind <*> go body
+      App fun params -> App <$> beta fun <*> traverse beta params
+      LetTuple binders rhs body -> LetTuple binders <$> beta rhs <*> go body
       where
-        resolve ident = M.findWithDefault ident ident env
+        beta ident = asks (M.findWithDefault ident ident)
