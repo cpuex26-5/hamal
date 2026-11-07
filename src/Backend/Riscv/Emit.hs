@@ -1,7 +1,7 @@
 module Backend.Riscv.Emit (emit) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
-import Basic (Cmp (..))
+import Basic (Binder (..), Cmp (..))
 import Buildable (Buildable (build))
 import Data.ByteString.Builder qualified as BB
 import Data.Map qualified as M
@@ -9,6 +9,7 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
 import Name (Fresh, Id, Label (..), fresh)
+import Type qualified as T
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
@@ -73,12 +74,12 @@ emitBlock dest = \case
       tell $ "\taddi\t" <> build Sp <> ", " <> build Sp <> ", " <> BB.intDec size <> "\n"
       tell @BB.Builder "\tret\n"
     NonTail reg -> emitNonTail reg inst
-  Let reg inst body -> emitNonTail reg inst *> emitBlock dest body
+  Let reg inst body -> emitNonTail reg.name inst *> emitBlock dest body
 
 emitFun :: (Fresh :> es, Writer BB.Builder :> es) => FunDef Reg -> Eff es ()
-emitFun FunDef {name, rhs} = do
+emitFun FunDef {binder, rhs} = do
   let frame = mkFrame rhs
-  tell $ build name <> ":\n"
+  tell $ build binder <> ":\n"
   tell $ "\taddi\t" <> build Sp <> ", " <> build Sp <> ", -" <> BB.intDec frame.size <> "\n"
   tell $ "\tsw\t" <> build Ra <> ", " <> BB.intDec (frame.size - 4) <> "(" <> build Sp <> ")\n"
   runReader frame $ emitBlock Tail rhs
@@ -88,4 +89,12 @@ emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
   mapM_ emitFun fundefs
   tell @BB.Builder ".global\tmin_caml_start\n"
-  emitFun (FunDef (Global "min_caml_start") [] block)
+  emitFun main
+  where
+    main =
+      FunDef
+        { binder = Global "min_caml_start"
+        , args = []
+        , rhs = block
+        , ret = T.Type T.Unit
+        }

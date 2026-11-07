@@ -12,7 +12,7 @@ data TypeF v
   | Fun [TypeF v] (TypeF v)
   | Array (TypeF v)
   | Var v
-  deriving stock (Show, Eq, Functor, Foldable, Traversable)
+  deriving stock (Show, Eq, Ord, Functor, Foldable, Traversable)
 
 instance Applicative TypeF where
   pure = Var
@@ -30,4 +30,4 @@ instance Monad TypeF where
     Var ty -> k ty
 
 newtype Type = Type (TypeF Void)
-  deriving newtype (Show, Eq)
+  deriving newtype (Show, Eq, Ord)

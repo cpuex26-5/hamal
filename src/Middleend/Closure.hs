@@ -1,12 +1,15 @@
 module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
 
-import Basic (Cmp, PrimOp)
+import Basic (Binder (..), Cmp, FunBind (..), PrimOp)
+import Data.Bifunctor (first)
+import Data.Map as M
 import Data.Set qualified as S
 import Effectful (Eff, runPureEff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
-import Middleend.KNormal (FunBind (..))
+import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Middleend.KNormal qualified as K
 import Name (Id, Label (Local))
+import Type (Type)
 
 data Closure = Closure
   { entry :: Label
@@ -21,8 +24,8 @@ data Exp
   | Var Id
   | PrimOp (PrimOp Id)
   | If Cmp Id Id Exp Exp
-  | Let Id Exp Exp
-  | LetTuple [Id] Id Exp
+  | Let (Binder Id Type) Exp Exp
+  | LetTuple [Binder Id Type] Id Exp
   | -- \| MakeCls Id Closure Exp
     -- \| AppCls Id [Id]
     AppDir Label [Id]
@@ -30,9 +33,9 @@ data Exp
   deriving stock (Eq, Show)
 
 data FunDef = FunDef
-  { name :: Label
-  , args :: [Id]
-  , formalFv :: [Id]
+  { binder :: Binder Label Type
+  , args :: [Binder Id Type]
+  , formalFv :: [Binder Id Type]
   , rhs :: Exp
   }
   deriving stock (Eq, Show)
@@ -40,10 +43,20 @@ data FunDef = FunDef
 data Program = Program [FunDef] Exp
   deriving stock (Eq, Show)
 
+freeVars :: Exp -> S.Set Id
+freeVars = \case
+  (Unit; Int _; Float _) -> S.empty
+  Var ident -> S.singleton ident
+  PrimOp op -> foldMap S.singleton op
+  If _ lhs rhs thn els -> S.singleton lhs <> S.singleton rhs <> freeVars thn <> freeVars els
+  Let binder rhs body -> S.difference (freeVars rhs <> freeVars body) $ S.singleton binder.name
+  AppDir _ params -> S.fromList params
+  LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList ((.name) <$> binders)
+
 closureConvert :: K.Exp -> Program
-closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
+closureConvert = uncurry (flip Program) . runPureEff . runOutput . runReader (M.empty :: M.Map Id Type) . go
   where
-    go :: (Output FunDef :> es) => K.Exp -> Eff es Exp
+    go :: (Output FunDef :> es, Reader (M.Map Id Type) :> es) => K.Exp -> Eff es Exp
     go = \case
       K.Unit -> pure Unit
       K.Int int -> pure $ Int int
@@ -51,21 +64,14 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . go
       K.Var ident -> pure $ Var ident
       K.PrimOp op -> pure $ PrimOp op
       K.If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
-      K.Let binder rhs body -> Let binder.name <$> go rhs <*> go body
+      K.Let binder rhs body -> Let binder <$> go rhs <*> local (withB binder) (go body)
       K.LetRec FunBind {binder, args, rhs} body -> do
-        rhs' <- go rhs
-        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList . map (.name) $ binder : args)
-        body' <- go body
-        output $ FunDef {name = Local binder.name, args = (.name) <$> args, formalFv = fv, rhs = rhs'}
+        rhs' <- local (foldMap withB (binder : args)) (go rhs)
+        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : args)
+        body' <- local (withB binder) (go body)
+        formalFv <- asks (\env -> (\name -> Binder {name, ty = env ! name}) <$> fv)
+        output $ FunDef {binder = first Local binder, args, formalFv, rhs = rhs'}
         pure body'
-      K.LetTuple binders rhs body -> LetTuple ((.name) <$> binders) rhs <$> go body
+      K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap withB binders) (go body)
       K.App fun params -> pure $ AppDir (Local fun) params
-
-    freeVars = \case
-      (Unit; Int _; Float _) -> S.empty
-      Var ident -> S.singleton ident
-      PrimOp op -> foldMap S.singleton op
-      If _ lhs rhs thn els -> S.fromList [lhs, rhs] <> freeVars thn <> freeVars els
-      Let binder rhs body -> S.difference (freeVars rhs <> freeVars body) $ S.singleton binder
-      AppDir _ params -> S.fromList params
-      LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList binders
+    withB binder = M.insert binder.name binder.ty

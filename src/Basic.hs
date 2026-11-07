@@ -27,7 +27,7 @@ data Cmp = Eq | Le
   deriving stock (Show, Eq)
 
 data Binder n t = Binder {name :: n, ty :: t}
-  deriving stock (Show, Eq, Functor, Foldable, Traversable)
+  deriving stock (Show, Eq, Ord, Functor, Foldable, Traversable)
 
 deriveBifunctor ''Binder
 deriveBifoldable ''Binder

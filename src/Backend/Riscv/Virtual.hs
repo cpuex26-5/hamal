@@ -5,6 +5,7 @@ import Basic qualified as B
 import Effectful (Eff, (:>))
 import Middleend.Closure qualified as C
 import Name (Fresh, Id)
+import Type qualified as T
 
 virtualBlock :: (Fresh :> es) => C.Exp -> Eff es (Block Id)
 virtualBlock = \case
@@ -28,10 +29,12 @@ virtualBlock = \case
       Let binder' rhs' body' -> Let binder' rhs' $ insertLet binder body' body
 
 virtualFunc :: (Fresh :> es) => C.FunDef -> Eff es (FunDef Id)
-virtualFunc C.FunDef {name, args, formalFv, rhs} = do
-  rhs' <- virtualBlock rhs
-  let (_, load) = foldr (\fv (offset, rest) -> (offset + 4, Let fv (Lwl offset name) rest)) (4, rhs') formalFv
-  pure $ FunDef {name, args, rhs = load}
+virtualFunc C.FunDef {binder, args, formalFv, rhs} = case binder.ty of
+  T.Type (T.Fun _ ret) -> do
+    rhs' <- virtualBlock rhs
+    let (_, load) = foldr (\fv (offset, rest) -> (offset + 4, Let fv (Lwl offset binder.name) rest)) (4, rhs') formalFv
+    pure $ FunDef {binder = binder.name, args = (.name) <$> args, rhs = load, ret = T.Type ret}
+  _ -> error "unreachable"
 
 genVirtual :: (Fresh :> es) => C.Program -> Eff es (Program Id)
 genVirtual (C.Program fundefs expr) = Program <$> traverse virtualFunc fundefs <*> virtualBlock expr
