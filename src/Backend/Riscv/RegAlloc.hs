@@ -1,17 +1,16 @@
 module Backend.Riscv.RegAlloc (regAlloc) where
 
-import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
+import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..), RegClass (..))
 import Basic (Binder (..))
 import Data.Bifunctor (Bifunctor (bimap))
 import Name (Id)
-import Type qualified as T
 
 regAlloc :: Program Id -> Program Reg
 regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock block)
   where
     binding = zip (enumFrom A0) -- TODO: assertion
     restoring = foldr (\(reg, Binder {name, ty}) -> Let (Binder reg ty) (Restore name))
-    saving reg ident = Let (Binder Zero (T.Type T.Unit)) (Save reg ident)
+    saving reg ident = Let (Binder Zero IReg) (Save reg ident)
     storing = foldr (uncurry saving)
 
     allocFun :: FunDef Id -> FunDef Reg
@@ -23,7 +22,7 @@ regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock bl
         , ret
         }
 
-    allocInst :: Inst Id -> (Inst Reg, [Binder Id T.Type])
+    allocInst :: Inst Id -> (Inst Reg, [Binder Id RegClass])
     allocInst = \case
       Nop -> (Nop, [])
       Li imm -> (Li imm, [])
@@ -41,7 +40,7 @@ regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock bl
       Save dst src -> (Save T0 src, [int dst])
       Restore ident -> (Restore ident, [])
       where
-        int ident = Binder ident (T.Type T.Int)
+        int ident = Binder ident IReg
 
     allocBlock :: Block Id -> Block Reg
     allocBlock = \case

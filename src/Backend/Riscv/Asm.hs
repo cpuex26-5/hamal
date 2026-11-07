@@ -1,14 +1,16 @@
-module Backend.Riscv.Asm (Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
+module Backend.Riscv.Asm (RegClass (..), Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
 
 import Basic (Binder, Cmp)
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec)
 import Name (Id, Label)
-import Type (Type)
+
+data RegClass = IReg | FReg
+  deriving stock (Show, Eq)
 
 data Block r
   = Ans (Inst r)
-  | Let (Binder r Type) (Inst r) (Block r)
+  | Let (Binder r RegClass) (Inst r) (Block r)
   deriving stock (Show, Eq)
 
 data Inst r
@@ -33,7 +35,7 @@ data FunDef r = FunDef
   { binder :: Label
   , args :: [r]
   , rhs :: Block r
-  , ret :: Type
+  , ret :: RegClass
   }
   deriving stock (Show, Eq)
 

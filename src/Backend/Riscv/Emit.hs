@@ -1,6 +1,6 @@
 module Backend.Riscv.Emit (emit) where
 
-import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..))
+import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..), RegClass (IReg))
 import Basic (Binder (..), Cmp (..), Rel (..))
 import Buildable (Buildable (build))
 import Data.ByteString.Builder qualified as BB
@@ -9,7 +9,6 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
 import Name (Fresh, Id, Label (..), fresh)
-import Type qualified as T
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
@@ -101,5 +100,5 @@ emit (Program fundefs block) = execWriter do
         { binder = Global "min_caml_start"
         , args = []
         , rhs = block
-        , ret = T.Type T.Unit
+        , ret = IReg
         }
