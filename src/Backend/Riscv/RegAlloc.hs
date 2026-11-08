@@ -1,8 +1,18 @@
 module Backend.Riscv.RegAlloc (regAlloc) where
 
 import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), XReg (..), dstOf, idOf)
-import Control.Monad (zipWithM)
 import Name (Id)
+
+xargRegs :: [XReg]
+xargRegs = [A0 .. A7]
+
+fargRegs :: [FReg]
+fargRegs = [Fa0 .. Fa7]
+
+assignArgs :: [a] -> [b] -> [(a, b)]
+assignArgs regs args
+  | length regs <= length args = zip regs args
+  | otherwise = error "assignArgs: too many arguments"
 
 data Restoring where
   Restoring :: Operand c XReg FReg -> Id -> Restoring
@@ -16,18 +26,15 @@ allocFun :: FunDef Id Id -> FunDef XReg FReg
 allocFun FunDef {binder, xargs, fargs, rhs, ret} =
   FunDef
     { binder
-    , xargs = fst <$> xregs
-    , fargs = fst <$> fregs
-    , rhs = storing (allocBlock rhs)
+    , xargs = fst <$> xpairs
+    , fargs = fst <$> fpairs
+    , rhs = foldr (Let Nothing) (allocBlock rhs) saves
     , ret
     }
   where
-    -- TODO: assertion
-    xregs = zip (enumFrom A0) xargs
-    fregs = zip (enumFrom Fa0) fargs
-    storing =
-      flip (foldr (\(x, ident) b -> Let Nothing (Save ident (OpX x)) b)) xregs
-        . flip (foldr (\(f, ident) b -> Let Nothing (Save ident (OpF f)) b)) fregs
+    xpairs = assignArgs xargRegs xargs
+    fpairs = assignArgs fargRegs fargs
+    saves = [Save i (OpX x) | (x, i) <- xpairs] <> [Save i (OpF f) | (f, i) <- fpairs]
 
 allocInst :: Inst c Id Id -> ([Restoring], Inst c XReg FReg)
 allocInst = \case
@@ -51,7 +58,10 @@ allocInst = \case
   StoreL (OpF f) label offset -> StoreL . OpF <$> rf Ft0 f <*> pure label <*> pure offset
   If rel lhs rhs thn els -> If rel <$> rx T0 lhs <*> rx T1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
   FIf rel lhs rhs thn els -> FIf rel <$> rf Ft0 lhs <*> rf Ft1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
-  CallDir fun xprms fprms -> CallDir fun <$> zipWithM rx [A0 .. A7] xprms <*> zipWithM rf [Fa0 .. Fa7] fprms
+  CallDir fun xprms fprms ->
+    CallDir fun
+      <$> traverse (uncurry rx) (assignArgs xargRegs xprms)
+      <*> traverse (uncurry rf) (assignArgs fargRegs fprms)
   Save dst (OpX x) -> Save dst . OpX <$> rx T0 x
   Save dst (OpF f) -> Save dst . OpF <$> rf Ft0 f
   Restore ident -> pure $ Restore ident
