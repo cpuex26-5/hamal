@@ -67,6 +67,7 @@ allocInst = \case
   FloatOfInt x -> FloatOfInt <$> rx T0 x
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f
   Out x -> Out <$> rx T0 x
+  Alloc size -> pure (Alloc size)
   where
     rx x ident = ([Restoring (OpX x) ident], x)
     rf f ident = ([Restoring (OpF f) ident], f)

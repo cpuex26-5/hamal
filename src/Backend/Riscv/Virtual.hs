@@ -44,9 +44,23 @@ vBlock c = \case
     rhs' <- vBlock c' rhs
     body' <- local (M.insert binder.name (SomeClass c')) (vBlock c body)
     pure $ insertLet (operand c' binder.name) rhs' body'
-  -- C.LetTuple binders rhs body -> error "unimplemented(LetTuple)"
+  C.LetTuple binders rhs body -> do
+    body' <- local @Env (M.union (M.fromList [(b.name, classOf b.ty) | b <- binders])) (vBlock c body)
+    pure $ foldr load body' (zip binders [0, 4 ..])
+    where
+      load (binder, offset) b = case classOf binder.ty of
+        SomeClass SGPR -> Let (Just (OpX binder.name)) (Lw offset rhs) b
+        SomeClass SFPR -> Let (Just (OpF binder.name)) (FLw offset rhs) b
+        SomeClass SVoid -> b
   C.If (ICmp rel) lhs rhs thn els -> Ans <$> (If rel lhs rhs <$> vBlock c thn <*> vBlock c els)
   C.If (FCmp rel) lhs rhs thn els -> Ans <$> (FIf rel lhs rhs <$> vBlock c thn <*> vBlock c els)
+  C.PrimOp (B.Tuple binders) | SGPR <- c -> do
+    tuple <- fresh "tuple"
+    classes <- traverse (asks @Env . M.findWithDefault (error "unreachable")) binders
+    let store (x, SomeClass c', offset) b = maybe b (\op -> Let Nothing (Store op tuple offset) b) (operand c' x)
+    pure
+      $ Let (Just (OpX tuple)) (Alloc (4 * length binders))
+      $ foldr store (Ans (Mv (OpX tuple))) (zip3 binders classes [0, 4 ..])
   e -> Ans <$> vInst c e
 
 vInst :: (Reader Env :> es, State Fnv :> es, Fresh :> es) => SingClass c -> C.Exp -> Eff es (Inst c Id Id)
@@ -65,7 +79,7 @@ vInst c e = case (c, e) of
   (_, C.AppDir label params) ->
     uncurry (CallDir label) . partitionByClass
       <$> traverse (\n -> (n,) <$> classOfVar n) params
-  _ -> error "Virtual: unreachable"
+  _ -> error $ "vInst(unreachable): " <> show (c, e)
   where
     classOfVar = asks . M.findWithDefault (error "unreachable")
 
@@ -83,29 +97,25 @@ vPrimOp c e = case (c, e) of
   (SFPR, B.FMul lhs rhs) -> pure $ FMul lhs rhs
   (SFPR, B.FDiv lhs rhs) -> pure $ FDiv lhs rhs
   (SFPR, B.FSqrt ident) -> pure $ FSqrt ident
-  -- B.Tuple _ -> _
-  -- B.Array _ _ -> _
-  -- B.Get _ _ -> _
-  -- B.Put _ _ _ -> _
   (SFPR, B.FloatOfInt int) -> pure $ FloatOfInt int
   (SGPR, B.IntOfFloat float) -> pure $ IntOfFloat float
   (SVoid, B.Out ident) -> pure $ Out ident
-  _ -> error "virtualOp(unreachable)"
+  _ -> error $ "virtualOp(unreachable): " <> show (c, e)
 
 vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)
 vFunc C.FunDef {binder, args, formalFv, rhs} = case binder.ty of
   T.Type (T.Fun _ ret) | SomeClass c <- classOf (T.Type ret) -> do
     let env = M.fromList [(b.name, classOf b.ty) | b <- args <> formalFv]
     rhs' <- runReader env (vBlock c rhs)
-    let (_, load) =
+    let load =
           foldr
-            ( \fv (offset, rest) -> case classOf fv.ty of
-                SomeClass SGPR -> (offset + 4, Let (operand SGPR fv.name) (LwL offset binder.name) rest)
-                SomeClass SFPR -> (offset + 4, Let (operand SFPR fv.name) (FLwL offset binder.name) rest)
-                SomeClass SVoid -> (offset, rest)
+            ( \(fv, offset) rest -> case classOf fv.ty of
+                SomeClass SGPR -> Let (operand SGPR fv.name) (LwL offset binder.name) rest
+                SomeClass SFPR -> Let (operand SFPR fv.name) (FLwL offset binder.name) rest
+                SomeClass SVoid -> rest
             )
-            (4, rhs')
-            formalFv
+            rhs'
+            (zip formalFv [4, 4 ..])
     let (xargs, fargs) = partitionByClass [(b.name, classOf b.ty) | b <- args]
     pure $ FunDef {binder = binder.name, xargs, fargs, rhs = load, ret = c}
   _ -> error "unreachable"

@@ -39,6 +39,7 @@ data Inst (c :: RegClass) x f where
   StoreL :: Operand c x f -> Label -> Int -> Inst Void x f
   CallDir :: Label -> [x] -> [f] -> Inst c x f
   Save :: Id -> Operand c x f -> Inst Void x f
+  Alloc :: Int -> Inst GPR x f -- dst <- hp; hp <- hp + n
   Out :: x -> Inst Void x f
   -- GPR
   Li :: Int -> Inst GPR x f

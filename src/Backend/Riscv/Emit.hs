@@ -136,6 +136,9 @@ emitNonTail rdM = \case
   Out rs -> do
     emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
     emitI "sw" [build rs, memFormat 0 T1]
+  Alloc size -> do
+    for_ (xreg rdM) \rd -> emitI "mv" [build rd, build Tp]
+    emitI "addi" [build Tp, build Tp, BB.intDec size]
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
     xreg = fmap \(OpX r) -> r
