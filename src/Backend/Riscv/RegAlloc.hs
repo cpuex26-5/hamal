@@ -53,7 +53,6 @@ allocInst = \case
   Save dst (OpX x) -> Save dst . OpX <$> rx T0 x
   Save dst (OpF f) -> Save dst . OpF <$> rf Ft0 f
   Restore ident -> pure $ Restore ident
-  FLi imm -> pure (FLi imm)
   FNeg f -> FNeg <$> rf Ft0 f
   FAdd lhs rhs -> FAdd <$> rf Ft0 lhs <*> rf Ft1 rhs
   FSub lhs rhs -> FSub <$> rf Ft0 lhs <*> rf Ft1 rhs
@@ -81,4 +80,4 @@ allocBlock = \case
       withSave = maybe id (\b -> Let Nothing (Save (idOf b) (dstOf b))) dstM -- 必要なら A* から save
 
 regAlloc :: Program Id Id -> Program XReg FReg
-regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock block)
+regAlloc (Program floats fundefs block) = Program floats (allocFun <$> fundefs) (allocBlock block)

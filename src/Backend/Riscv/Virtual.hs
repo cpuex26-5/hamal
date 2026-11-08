@@ -6,11 +6,14 @@ import Basic qualified as B
 import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
+import Effectful.State.Static.Local (State, gets, modify, runState)
 import Middleend.Closure qualified as C
-import Name (Fresh, Id, Label (..))
+import Name (Fresh, Id, Label (..), fresh)
 import Type qualified as T
 
 type Env = M.Map Id SomeClass
+
+type Fnv = M.Map Float Label
 
 classOf :: T.Type -> SomeClass
 classOf (T.Type ty) = case ty of
@@ -35,7 +38,7 @@ insertLet :: Maybe (Operand c' x f) -> Block c' x f -> Block c x f -> Block c x 
 insertLet dst (Ans inst) k = Let dst inst k
 insertLet dst (Let d i rest) k = Let d i (insertLet dst rest k)
 
-vBlock :: (Fresh :> es, Reader Env :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
+vBlock :: (Fresh :> es, Reader Env :> es, State Fnv :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
 vBlock c = \case
   C.Let binder rhs body | SomeClass c' <- classOf binder.ty -> do
     rhs' <- vBlock c' rhs
@@ -46,11 +49,15 @@ vBlock c = \case
   C.If (FCmp rel) lhs rhs thn els -> Ans <$> (FIf rel lhs rhs <$> vBlock c thn <*> vBlock c els)
   e -> Ans <$> vInst c e
 
-vInst :: (Reader Env :> es) => SingClass c -> C.Exp -> Eff es (Inst c Id Id)
+vInst :: (Reader Env :> es, State Fnv :> es, Fresh :> es) => SingClass c -> C.Exp -> Eff es (Inst c Id Id)
 vInst c e = case (c, e) of
   (SVoid, C.Unit) -> pure Nop
   (SGPR, C.Int int) -> pure $ Li int
-  (SFPR, C.Float float) -> pure $ FLi float
+  (SFPR, C.Float float) -> FLwL 0 <$> (maybe new pure =<< gets @Fnv (M.lookup float))
+    where
+      new = do
+        label <- Local <$> fresh "Lf"
+        label <$ modify (M.insert float label)
   (_, C.PrimOp op) -> vPrimOp c op
   (SGPR, C.Var ident) -> pure $ Mv (OpX ident)
   (SFPR, C.Var ident) -> pure $ Mv (OpF ident)
@@ -83,7 +90,7 @@ vPrimOp c e = case (c, e) of
   (SVoid, B.Out ident) -> pure $ StoreL (OpX ident) (Global "UART_BASE") 0
   _ -> error "virtualOp(unreachable)"
 
-vFunc :: (Fresh :> es) => C.FunDef -> Eff es (FunDef Id Id)
+vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)
 vFunc C.FunDef {binder, args, formalFv, rhs} = case binder.ty of
   T.Type (T.Fun _ ret) | SomeClass c <- classOf (T.Type ret) -> do
     let env = M.fromList [(b.name, classOf b.ty) | b <- args <> formalFv]
@@ -102,6 +109,9 @@ vFunc C.FunDef {binder, args, formalFv, rhs} = case binder.ty of
   _ -> error "unreachable"
 
 virtualify :: (Fresh :> es) => C.Program -> Eff es (Program Id Id)
-virtualify (C.Program fundefs expr) =
-  runReader @Env M.empty $
-    Program <$> traverse vFunc fundefs <*> vBlock SVoid expr
+virtualify (C.Program fundefs expr) = do
+  ((fundefs', main), floats) <-
+    runState @Fnv M.empty
+      $ runReader @Env M.empty
+      $ (,) <$> traverse vFunc fundefs <*> vBlock SVoid expr
+  pure $ Program (M.toList floats) fundefs' main

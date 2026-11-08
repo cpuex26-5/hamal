@@ -3,6 +3,7 @@ module Backend.Riscv.Emit (emit) where
 import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), RegClass (..), SingClass (..), XReg (..))
 import Basic (Rel (..))
 import Buildable (Buildable (build))
+import Control.Monad (forM_)
 import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
 import Data.List (intersperse)
@@ -113,7 +114,6 @@ emitNonTail rdM = \case
   Restore ident -> for_ (xreg rdM) \rd -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
     emitI "lw" [build rd, memFormat offset Sp]
-  FLi _ -> undefined
   FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
   FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
@@ -158,7 +158,10 @@ emitFun FunDef {binder, rhs, ret} = do
   runReader frame $ emitBlock (Tail ret) rhs
 
 emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
-emit (Program fundefs block) = execWriter do
+emit (Program floats fundefs block) = execWriter do
+  tell @BB.Builder ".section\t.rodata\n"
+  forM_ floats \(float, label) ->
+    tell @BB.Builder $ "." <> build label <> ":\t.word 0x" <> BB.floatHexFixed float <> "\t# " <> BB.floatDec float <> "\n"
   tell @BB.Builder ".section\t.text\n"
   tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun main

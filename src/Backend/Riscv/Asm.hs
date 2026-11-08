@@ -55,7 +55,6 @@ data Inst (c :: RegClass) x f where
   LwL :: Int -> Label -> Inst GPR x f
   Restore :: Id -> Inst GPR x f
   -- FPR
-  FLi :: Float -> Inst FPR x f
   FAdd :: f -> f -> Inst FPR x f
   FNeg :: f -> Inst FPR x f
   Sub :: x -> x -> Inst GPR x f
@@ -83,7 +82,7 @@ data FunDef x f where
 
 deriving stock instance (Show x, Show f) => Show (FunDef x f)
 
-data Program x f = Program [FunDef x f] (Block Void x f)
+data Program x f = Program [(Float, Label)] [FunDef x f] (Block Void x f)
   deriving stock (Show)
 
 data XReg
