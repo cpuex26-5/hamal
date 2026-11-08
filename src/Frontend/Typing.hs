@@ -136,7 +136,7 @@ infer (sspan :< expr) = case expr of
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
       B.Not ty -> ty `ascribe` T.Bool $> T.Bool
-      B.Neg {}; B.Add {}; B.Sub {}; B.Mul {}; B.Div {} -> traverse_ (`ascribe` T.Int) op $> T.Int
+      B.Neg {}; B.Add {}; B.Sub {}; B.Sali {}; B.Sari {} -> traverse_ (`ascribe` T.Int) op $> T.Int
       B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {} -> traverse_ (`ascribe` T.Float) op $> T.Float
       B.Tuple tys -> pure (T.Tuple . map typeof $ tys)
       B.Array size initial -> do

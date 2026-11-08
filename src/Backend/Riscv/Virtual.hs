@@ -76,7 +76,8 @@ vPrimOp c e = case (c, e) of
   (SFPR, B.FNeg ident) -> pure $ FNeg ident
   (SGPR, B.Add lhs rhs) -> pure $ Add lhs rhs
   (SGPR, B.Sub lhs rhs) -> pure $ Sub lhs rhs
-  ((_, B.Mul {}); (_, B.Div {})) -> undefined
+  (SGPR, B.Sali ident shamt) -> pure $ Sali ident shamt
+  (SGPR, B.Sari ident shamt) -> pure $ Sari ident shamt
   (SFPR, B.FAdd lhs rhs) -> pure $ FAdd lhs rhs
   (SFPR, B.FSub lhs rhs) -> pure $ FSub lhs rhs
   (SFPR, B.FMul lhs rhs) -> pure $ FMul lhs rhs

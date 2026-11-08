@@ -25,10 +25,6 @@ data Operand (c :: RegClass) x f where
 
 deriving stock instance (Show x, Show f) => Show (Operand c x f)
 
--- instance (Buildable x, Buildable f) => Buildable (Operand c x f) where
---   build (OpX x) = build x
---   build (OpF f) = build f
-
 data Block (c :: RegClass) x f where
   Ans :: Inst c x f -> Block c x f
   Let :: Maybe (Operand c' x f) -> Inst c' x f -> Block c x f -> Block c x f
@@ -47,10 +43,13 @@ data Inst (c :: RegClass) x f where
   -- GPR
   Li :: Int -> Inst GPR x f
   La :: Label -> Inst GPR x f
+  Neg :: x -> Inst GPR x f
   Add :: x -> x -> Inst GPR x f
   Addi :: x -> Int -> Inst GPR x f
   Xori :: x -> Int -> Inst GPR x f
-  Neg :: x -> Inst GPR x f
+  Sub :: x -> x -> Inst GPR x f
+  Sali :: x -> Int -> Inst GPR x f
+  Sari :: x -> Int -> Inst GPR x f
   If :: Rel -> x -> x -> Block c x f -> Block c x f -> Inst c x f
   Lw :: Int -> x -> Inst GPR x f
   LwL :: Int -> Label -> Inst GPR x f
@@ -58,7 +57,6 @@ data Inst (c :: RegClass) x f where
   -- FPR
   FAdd :: f -> f -> Inst FPR x f
   FNeg :: f -> Inst FPR x f
-  Sub :: x -> x -> Inst GPR x f
   FSub :: f -> f -> Inst FPR x f
   FMul :: f -> f -> Inst FPR x f
   FDiv :: f -> f -> Inst FPR x f

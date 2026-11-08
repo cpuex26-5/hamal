@@ -4,6 +4,7 @@ module Frontend.Parser (parse) where
 import Basic
 import Control.Comonad (extract)
 import Control.Comonad.Cofree
+import Data.Bits
 import Data.Foldable1
 import Data.List.NonEmpty
 import Frontend.Lexer
@@ -83,8 +84,8 @@ expr :: { Parsed }
 
   | expr '+'  expr { extract $1 <> extract $3 :< PrimOp (Add $1 $3) }
   | expr '-'  expr { extract $1 <> extract $3 :< PrimOp (Sub $1 $3) }
-  | expr '*'  expr { extract $1 <> extract $3 :< PrimOp (Mul $1 $3) }
-  | expr '/'  expr { extract $1 <> extract $3 :< PrimOp (Div $1 $3) }
+  | expr '*'  int  { extract $1 <> $3.span    :< PrimOp (pseudoMul $1 $3.value) }
+  | expr '/'  int  { extract $1 <> $3.span    :< PrimOp (pseudoDiv $1 $3.value) }
 
   | expr '+.' expr { extract $1 <> extract $3 :< PrimOp (FAdd $1 $3) }
   | expr '-.' expr { extract $1 <> extract $3 :< PrimOp (FSub $1 $3) }
@@ -145,6 +146,14 @@ pattern :: { [Symbol] }
 {
 binder :: Symbol -> Binder Symbol ()
 binder name = Binder { name, ty = () }
+
+pseudoMul, pseudoDiv :: Parsed -> Int -> PrimOp Parsed
+pseudoMul e n
+  | n > 0 && n .&. (n - 1) == 0 = Sali e (countTrailingZeros n)
+  | otherwise = error "Parse error: the right hand side of '*' must be a literal which is some power of two."
+pseudoDiv e n
+  | n > 0 && n .&. (n - 1) == 0 = Sari e (countTrailingZeros n)
+  | otherwise = error "Parse error: the right hand side of '/' must be a literal which is some power of two."
 
 parseError :: Located Token -> Alex a
 parseError _ = do

@@ -41,6 +41,8 @@ allocInst = \case
   Addi lhs imm -> Addi <$> rx T0 lhs <*> pure imm
   Xori lhs imm -> Xori <$> rx T0 lhs <*> pure imm
   Sub lhs rhs -> Sub <$> rx T0 lhs <*> rx T1 rhs
+  Sali x shamt -> Sali <$> rx T0 x <*> pure shamt
+  Sari x shamt -> Sari <$> rx T0 x <*> pure shamt
   Lw offset addr -> Lw offset <$> rx T0 addr
   LwL offset label -> pure (LwL offset label)
   Store (OpX x) addr offset -> Store . OpX <$> rx T0 x <*> rx T1 addr <*> pure offset

@@ -56,6 +56,8 @@ emitNonTail rdM = \case
   Addi rs1 imm -> for_ (xreg rdM) \rd -> emitI "addi" [build rd, build rs1, BB.intDec imm]
   Xori rs1 imm -> for_ (xreg rdM) \rd -> emitI "xori" [build rd, build rs1, BB.intDec imm]
   Sub rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build rs1, build rs2]
+  Sali rs imm -> for_ (xreg rdM) \rd -> emitI "sali" [build rd, build rs, BB.intDec imm]
+  Sari rs imm -> for_ (xreg rdM) \rd -> emitI "sari" [build rd, build rs, BB.intDec imm]
   Lw offset rs -> for_ (xreg rdM) \rd -> emitI "lw" [build rd, memFormat offset rs]
   LwL offset label -> for_ (xreg rdM) \rd -> do
     emitI "la" [build T1, build label]

@@ -12,9 +12,8 @@ data PrimOp a
   | FNeg a
   | Add a a
   | Sub a a
-  | -- TODO: 始めから parse 時に shift にしておく
-    Mul a a
-  | Div a a
+  | Sali a Int
+  | Sari a Int
   | FAdd a a
   | FSub a a
   | FMul a a
@@ -36,8 +35,8 @@ instance (Pretty a) => Pretty (PrimOp a) where
     FNeg e -> "-." <+> pretty e
     Add l r -> pretty l <+> "+" <+> pretty r
     Sub l r -> pretty l <+> "-" <+> pretty r
-    Mul l r -> pretty l <+> "*" <+> pretty r
-    Div l r -> pretty l <+> "/" <+> pretty r
+    Sali e shamt -> pretty e <+> "<<" <+> pretty shamt
+    Sari e shamt -> pretty e <+> "/" <+> pretty shamt
     FAdd l r -> pretty l <+> "+." <+> pretty r
     FSub l r -> pretty l <+> "-." <+> pretty r
     FMul l r -> pretty l <+> "*." <+> pretty r
