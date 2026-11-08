@@ -123,6 +123,7 @@ emitNonTail rdM = \case
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
   FMul lhs rhs -> for_ (freg rdM) \rd -> emitI "fmul.s" [build rd, build lhs, build rhs]
   FDiv lhs rhs -> for_ (freg rdM) \rd -> emitI "fdiv.s" [build rd, build lhs, build rhs]
+  FSqrt rs -> for_ (freg rdM) \rd -> emitI "fsqrt" [build rd, build rs]
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
   FLwL offset label -> for_ (freg rdM) \rd -> do
     emitI "la" [build T1, build label]

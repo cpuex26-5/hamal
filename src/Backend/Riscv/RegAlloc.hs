@@ -60,6 +60,7 @@ allocInst = \case
   FSub lhs rhs -> FSub <$> rf Ft0 lhs <*> rf Ft1 rhs
   FMul lhs rhs -> FMul <$> rf Ft0 lhs <*> rf Ft1 rhs
   FDiv lhs rhs -> FDiv <$> rf Ft0 lhs <*> rf Ft1 rhs
+  FSqrt f -> FSqrt <$> rf Ft0 f
   FLw offset addr -> FLw offset <$> rx T0 addr
   FLwL offset label -> pure (FLwL offset label)
   FRestore ident -> pure $ FRestore ident

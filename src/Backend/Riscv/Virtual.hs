@@ -82,6 +82,7 @@ vPrimOp c e = case (c, e) of
   (SFPR, B.FSub lhs rhs) -> pure $ FSub lhs rhs
   (SFPR, B.FMul lhs rhs) -> pure $ FMul lhs rhs
   (SFPR, B.FDiv lhs rhs) -> pure $ FDiv lhs rhs
+  (SFPR, B.FSqrt ident) -> pure $ FSqrt ident
   -- B.Tuple _ -> _
   -- B.Array _ _ -> _
   -- B.Get _ _ -> _

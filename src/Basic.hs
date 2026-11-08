@@ -18,6 +18,7 @@ data PrimOp a
   | FSub a a
   | FMul a a
   | FDiv a a
+  | FSqrt a
   | Tuple [a]
   | Array a a
   | Get a a
@@ -41,6 +42,7 @@ instance (Pretty a) => Pretty (PrimOp a) where
     FSub l r -> pretty l <+> "-." <+> pretty r
     FMul l r -> pretty l <+> "*." <+> pretty r
     FDiv l r -> pretty l <+> "/." <+> pretty r
+    FSqrt e -> "sqrt" <+> pretty e
     Tuple es -> tupled (pretty <$> es)
     Array n x -> "Array.make" <+> pretty n <+> pretty x
     Get arr idx -> pretty arr <> ".(" <> pretty idx <> ")"

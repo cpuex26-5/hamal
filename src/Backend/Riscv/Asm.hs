@@ -60,6 +60,7 @@ data Inst (c :: RegClass) x f where
   FSub :: f -> f -> Inst FPR x f
   FMul :: f -> f -> Inst FPR x f
   FDiv :: f -> f -> Inst FPR x f
+  FSqrt :: f -> Inst FPR x f
   FIf :: Rel -> f -> f -> Block c x f -> Block c x f -> Inst c x f
   FLw :: Int -> x -> Inst FPR x f
   FLwL :: Int -> Label -> Inst FPR x f

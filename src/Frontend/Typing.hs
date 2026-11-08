@@ -137,7 +137,7 @@ infer (sspan :< expr) = case expr of
     inferPrim op = case op of
       B.Not ty -> ty `ascribe` T.Bool $> T.Bool
       B.Neg {}; B.Add {}; B.Sub {}; B.Sali {}; B.Sari {} -> traverse_ (`ascribe` T.Int) op $> T.Int
-      B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {} -> traverse_ (`ascribe` T.Float) op $> T.Float
+      B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {}; B.FSqrt {} -> traverse_ (`ascribe` T.Float) op $> T.Float
       B.Tuple tys -> pure (T.Tuple . map typeof $ tys)
       B.Array size initial -> do
         size `ascribe` T.Int
@@ -167,6 +167,7 @@ infer (sspan :< expr) = case expr of
       , ("float_of_int", FloatOfInt ())
       , ("int_of_float", IntOfFloat ())
       , ("print_char", Out ())
+      , ("sqrt", FSqrt ())
       ]
     fill shape xs = case runStateT (traverse (const (StateT uncons)) shape) xs of
       Just (filled, []) -> Just filled
