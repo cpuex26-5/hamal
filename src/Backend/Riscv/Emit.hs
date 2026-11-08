@@ -1,10 +1,12 @@
 module Backend.Riscv.Emit (emit) where
 
-import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..), RegClass (IReg))
-import Basic (Binder (..), Cmp (..), Rel (..))
+import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), RegClass (..), SingClass (..), XReg (..))
+import Basic (Rel (..))
 import Buildable (Buildable (build))
 import Data.ByteString.Builder qualified as BB
-import Data.Map qualified as M
+import Data.Foldable (for_)
+import Data.List (intersperse)
+import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
@@ -12,38 +14,60 @@ import Name (Fresh, Id, Label (..), fresh)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
-data Dest = Tail | NonTail Reg
+data Dest c where
+  Tail :: SingClass c -> Dest c
+  NonTail :: Maybe (Operand c XReg FReg) -> Dest c
 
-mkFrame :: Block r -> Frame
+mkFrame :: Block c x f -> Frame
 mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
   where
     slots = M.fromList $ zip (saveB block) [0, 4 ..]
     align n = ((n + 15) `div` 16) * 16
-
     saveB = \case
       Ans inst -> saveI inst
       Let _ rhs body -> saveI rhs <> saveB body
+    saveI :: Inst c x f -> [Id]
     saveI = \case
-      Nop; Li {}; La {}; Mv {}; Add {}; Addi {}; Neg {}; Sub {}; Lw {}; Lwl {}; Sw {}; CallDir {}; Restore {} -> []
       If _ _ _ thn els -> saveB thn <> saveB els
-      Save _ ident -> [ident]
+      FIf _ _ _ thn els -> saveB thn <> saveB els
+      Save ident _ -> [ident]
+      _ -> []
 
-emitNonTail :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Reg -> Inst Reg -> Eff es ()
-emitNonTail rd = \case
+emitI :: (Writer BB.Builder :> es) => BB.Builder -> [BB.Builder] -> Eff es ()
+emitI op args = tell $ "\t" <> op <> "\t" <> mconcat (intersperse ", " args) <> "\n"
+
+emitL :: (Writer BB.Builder :> es) => Label -> Eff es ()
+emitL label = tell $ build label <> ":\n"
+
+memFormat :: (Buildable a) => Int -> a -> BB.Builder
+memFormat offset base = BB.intDec offset <> "(" <> build base <> ")"
+
+emitNonTail :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Maybe (Operand c XReg FReg) -> Inst c XReg FReg -> Eff es ()
+emitNonTail rdM = \case
   Nop -> pure ()
-  Li imm -> tell $ "\tli\t" <> build rd <> ", " <> BB.intDec imm <> "\n"
-  La label -> tell $ "\tla\t" <> build rd <> ", " <> build label <> "\n"
-  Mv rs -> tell $ "\tmv\t" <> build rd <> ", " <> build rs <> "\n"
-  Add rs1 rs2 -> tell $ "\tadd\t" <> build rd <> ", " <> build rs1 <> ", " <> build rs2 <> "\n"
-  Addi rs1 imm -> tell $ "\taddi\t" <> build rd <> ", " <> build rs1 <> ", " <> BB.intDec imm <> "\n"
-  Neg rs -> tell $ "\tsub\t" <> build rd <> ", " <> build Zero <> ", " <> build rs <> "\n"
-  Sub rs1 rs2 -> tell $ "\tsub\t" <> build rd <> ", " <> build rs1 <> ", " <> build rs2 <> "\n"
-  Lw offset rs -> tell $ "\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build rs <> ")\n"
-  Lwl offset label ->
-    tell ("\tla\t" <> build T0 <> ", " <> build label <> "\n")
-      *> tell ("\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build T0 <> ")\n")
-  Sw rd' rs offset -> tell $ "\tsw\t" <> build rd' <> ", " <> BB.intDec offset <> "(" <> build rs <> ")\n"
-  If (ICmp rel) lhs rhs thn els -> do
+  Li imm -> for_ (xreg rdM) \rd -> emitI "li" [build rd, BB.intDec imm]
+  La label -> for_ (xreg rdM) \rd -> emitI "la" [build rd, build label]
+  Mv rs -> case rs of
+    OpX x -> for_ (xreg rdM) \rd -> emitI "mv" [build rd, build x]
+    OpF f -> for_ (freg rdM) \rd -> emitI "fmv.s" [build rd, build f]
+  Add rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "add" [build rd, build rs1, build rs2]
+  Addi rs1 imm -> for_ (xreg rdM) \rd -> emitI "addi" [build rd, build rs1, BB.intDec imm]
+  Xori rs1 imm -> for_ (xreg rdM) \rd -> emitI "xori" [build rd, build rs1, BB.intDec imm]
+  Neg rs -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build Zero, build rs]
+  Sub rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build rs1, build rs2]
+  Lw offset rs -> for_ (xreg rdM) \rd -> emitI "lw" [build rd, memFormat offset rs]
+  LwL offset label -> for_ (xreg rdM) \rd -> do
+    emitI "la" [build T0, build label]
+    emitI "lw" [build rd, memFormat offset T0]
+  Store rs addr offset -> case rs of
+    OpX x -> emitI "sw" [build x, memFormat offset addr]
+    OpF f -> emitI "fsw" [build f, memFormat offset addr]
+  StoreL rs label offset -> do
+    emitI "la" [build T0, build label]
+    case rs of
+      OpX x -> emitI "sw" [build x, memFormat offset T0]
+      OpF f -> emitI "fsw" [build f, memFormat offset T0]
+  If rel lhs rhs thn els -> do
     label_else <- Local <$> fresh "else"
     label_cont <- Local <$> fresh "cont"
     let b = case rel of
@@ -53,52 +77,98 @@ emitNonTail rd = \case
           Le -> "bgt"
           Gt -> "ble"
           Ge -> "blt"
-    tell $ "\t" <> b <> "\t" <> build lhs <> ", " <> build rhs <> ", " <> build label_else <> "\n"
-    emitBlock (NonTail rd) thn
-    tell $ "\tj\t" <> build label_cont <> "\n"
-    tell $ build label_else <> ":\n"
-    emitBlock (NonTail rd) els
-    tell $ build label_cont <> ":\n"
-  If (FCmp _rel) _lhs _rhs _thn _els -> undefined -- TODO: fcmp
-  CallDir fun _ -> tell $ "\tcall\t" <> build fun <> "\n"
-  Save rs ident -> do
+    emitI b [build lhs, build rhs, build label_else]
+    emitBlock (NonTail rdM) thn
+    emitI "j" [build label_cont]
+    emitL label_else
+    emitBlock (NonTail rdM) els
+    emitI "j" [build label_cont]
+    emitL label_cont
+  FIf rel lhs rhs thn els -> do
+    label_else <- Local <$> fresh "else"
+    label_cont <- Local <$> fresh "cont"
+    let s = case rel of
+          Eq -> "feq.s"
+          Neq -> "fneq.s"
+          Lt -> "flt.s"
+          Le -> "fle.s"
+          Gt -> "fgt.s"
+          Ge -> "fge.s"
+    emitI s [build T0, build lhs, build rhs]
+    emitI "beqz" [build T0, build label_else]
+    emitBlock (NonTail rdM) thn
+    emitI "j" [build label_cont]
+    emitL label_else
+    emitBlock (NonTail rdM) els
+    emitI "j" [build label_cont]
+    emitL label_cont
+  CallDir fun _ _ -> do
+    emitI "call" [build fun]
+    for_ rdM \case
+      OpX x -> emitI "mv" [build x, build A0]
+      OpF f -> emitI "fmv.s" [build f, build Fa0]
+  Save ident rs -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
-    tell $ "\tsw\t" <> build rs <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
-  Restore ident -> do
+    emitI "sw" [build rs, memFormat offset Sp]
+  Restore ident -> for_ (xreg rdM) \rd -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
-    tell $ "\tlw\t" <> build rd <> ", " <> BB.intDec offset <> "(" <> build Sp <> ")\n"
+    emitI "lw" [build rd, memFormat offset Sp]
+  FLi _ -> undefined
+  FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
+  FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
+  FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
+  FMul lhs rhs -> for_ (freg rdM) \rd -> emitI "fmul.s" [build rd, build lhs, build rhs]
+  FDiv lhs rhs -> for_ (freg rdM) \rd -> emitI "fdiv.s" [build rd, build lhs, build rhs]
+  FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
+  FLwL offset label -> for_ (freg rdM) \rd -> do
+    emitI "la" [build T0, build label]
+    emitI "flw" [build rd, memFormat offset T0]
+  FRestore ident -> for_ (freg rdM) \rd -> do
+    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
+    emitI "flw" [build rd, memFormat offset Sp]
+  FloatOfInt rs -> for_ (freg rdM) \rd -> emitI "fcvt.s.w" [build rd, build rs]
+  IntOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fcvt.w.s" [build rd, build rs]
+  where
+    xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
+    xreg = fmap \(OpX r) -> r
+    freg :: Maybe (Operand FPR XReg FReg) -> Maybe FReg
+    freg = fmap \(OpF r) -> r
 
-emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest -> Block Reg -> Eff es ()
+emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest c -> Block c XReg FReg -> Eff es ()
 emitBlock dest = \case
   Ans inst -> case dest of
-    Tail -> do
-      emitNonTail A0 inst
+    Tail c -> do
+      case c of
+        SGPR -> emitNonTail (Just (OpX A0)) inst
+        SFPR -> emitNonTail (Just (OpF Fa0)) inst
+        SVoid -> emitNonTail Nothing inst
       size <- asks @Frame (.size)
-      tell $ "\tlw\t" <> build Ra <> ", " <> BB.intDec (size - 4) <> "(" <> build Sp <> ")\n"
-      tell $ "\taddi\t" <> build Sp <> ", " <> build Sp <> ", " <> BB.intDec size <> "\n"
+      emitI "lw" [build Ra, memFormat (size - 4) Sp]
+      emitI "addi" [build Sp, build Sp, BB.intDec size]
       tell @BB.Builder "\tret\n"
     NonTail reg -> emitNonTail reg inst
-  Let reg inst body -> emitNonTail reg.name inst *> emitBlock dest body
+  Let rd inst body -> emitNonTail rd inst *> emitBlock dest body
 
-emitFun :: (Fresh :> es, Writer BB.Builder :> es) => FunDef Reg -> Eff es ()
-emitFun FunDef {binder, rhs} = do
+emitFun :: (Fresh :> es, Writer BB.Builder :> es) => FunDef XReg FReg -> Eff es ()
+emitFun FunDef {binder, rhs, ret} = do
   let frame = mkFrame rhs
-  tell $ build binder <> ":\n"
-  tell $ "\taddi\t" <> build Sp <> ", " <> build Sp <> ", -" <> BB.intDec frame.size <> "\n"
-  tell $ "\tsw\t" <> build Ra <> ", " <> BB.intDec (frame.size - 4) <> "(" <> build Sp <> ")\n"
-  runReader frame $ emitBlock Tail rhs
+  emitL binder
+  emitI "addi" [build Sp, build Sp, "-" <> BB.intDec frame.size]
+  emitI "sw" [build Ra, memFormat (frame.size - 4) Sp]
+  runReader frame $ emitBlock (Tail ret) rhs
 
-emit :: (Fresh :> es) => Program Reg -> Eff es BB.Builder
+emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
 emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
-  mapM_ emitFun fundefs
   tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun main
+  mapM_ emitFun fundefs
   where
     main =
       FunDef
         { binder = Global "min_caml_start"
-        , args = []
+        , xargs = []
+        , fargs = []
         , rhs = block
-        , ret = IReg
+        , ret = SVoid
         }

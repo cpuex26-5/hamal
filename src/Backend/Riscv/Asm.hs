@@ -1,48 +1,92 @@
-module Backend.Riscv.Asm (RegClass (..), Block (..), Inst (..), FunDef (..), Program (..), Reg (..)) where
+module Backend.Riscv.Asm (RegClass (..), SingClass (..), SomeClass (..), Operand (..), Block (..), Inst (..), FunDef (..), Program (..), XReg (..), FReg (..), idOf, dstOf) where
 
-import Basic (Binder, Cmp)
+import Basic (Rel)
 import Buildable (Buildable (..))
-import Data.ByteString.Builder (intDec)
+import Data.ByteString.Builder (string7)
+import Data.Char (toLower)
 import Name (Id, Label)
 
-data RegClass = IReg | FReg
+data RegClass = GPR | FPR | Void
   deriving stock (Show, Eq)
 
-data Block r
-  = Ans (Inst r)
-  | Let (Binder r RegClass) (Inst r) (Block r)
-  deriving stock (Show, Eq)
+data SingClass (c :: RegClass) where
+  SGPR :: SingClass GPR
+  SFPR :: SingClass FPR
+  SVoid :: SingClass Void
 
-data Inst r
-  = Nop
-  | Li Int
-  | La Label
-  | Mv r
-  | Add r r
-  | Addi r Int
-  | Neg r
-  | Sub r r
-  | Lw Int r
-  | Lwl Int Label
-  | Sw r r Int
-  | If Cmp r r (Block r) (Block r)
-  | CallDir Label [r]
-  | Save r Id
-  | Restore Id
-  deriving stock (Show, Eq)
+deriving stock instance Show (SingClass c)
 
-data FunDef r = FunDef
-  { binder :: Label
-  , args :: [r]
-  , rhs :: Block r
-  , ret :: RegClass
-  }
-  deriving stock (Show, Eq)
+data SomeClass where
+  SomeClass :: SingClass c -> SomeClass
 
-data Program r = Program [FunDef r] (Block r)
-  deriving stock (Show, Eq)
+data Operand (c :: RegClass) x f where
+  OpX :: x -> Operand GPR x f
+  OpF :: f -> Operand FPR x f
 
-data Reg
+deriving stock instance (Show x, Show f) => Show (Operand c x f)
+
+instance (Buildable x, Buildable f) => Buildable (Operand c x f) where
+  build (OpX x) = build x
+  build (OpF f) = build f
+
+data Block (c :: RegClass) x f where
+  Ans :: Inst c x f -> Block c x f
+  Let :: Maybe (Operand c' x f) -> Inst c' x f -> Block c x f -> Block c x f
+
+deriving stock instance (Show x, Show f) => Show (Block c x f)
+
+data Inst (c :: RegClass) x f where
+  -- Common
+  Nop :: Inst Void x f
+  Mv :: Operand c x f -> Inst c x f
+  Store :: Operand c x f -> x -> Int -> Inst Void x f
+  StoreL :: Operand c x f -> Label -> Int -> Inst Void x f
+  CallDir :: Label -> [x] -> [f] -> Inst c x f
+  Save :: Id -> Operand c x f -> Inst Void x f
+  -- GPR
+  Li :: Int -> Inst GPR x f
+  La :: Label -> Inst GPR x f
+  Add :: x -> x -> Inst GPR x f
+  Addi :: x -> Int -> Inst GPR x f
+  Xori :: x -> Int -> Inst GPR x f
+  Neg :: x -> Inst GPR x f
+  If :: Rel -> x -> x -> Block c x f -> Block c x f -> Inst c x f
+  Lw :: Int -> x -> Inst GPR x f
+  LwL :: Int -> Label -> Inst GPR x f
+  Restore :: Id -> Inst GPR x f
+  -- FPR
+  FLi :: Float -> Inst FPR x f
+  FAdd :: f -> f -> Inst FPR x f
+  FNeg :: f -> Inst FPR x f
+  Sub :: x -> x -> Inst GPR x f
+  FSub :: f -> f -> Inst FPR x f
+  FMul :: f -> f -> Inst FPR x f
+  FDiv :: f -> f -> Inst FPR x f
+  FIf :: Rel -> f -> f -> Block c x f -> Block c x f -> Inst c x f
+  FLw :: Int -> x -> Inst FPR x f
+  FLwL :: Int -> Label -> Inst FPR x f
+  FRestore :: Id -> Inst FPR x f
+  FloatOfInt :: x -> Inst FPR x f
+  IntOfFloat :: f -> Inst GPR x f
+
+deriving stock instance (Show x, Show f) => Show (Inst c x f)
+
+data FunDef x f where
+  FunDef ::
+    { binder :: Label
+    , xargs :: [x]
+    , fargs :: [f]
+    , rhs :: Block c x f
+    , ret :: SingClass c
+    } ->
+    FunDef x f
+
+deriving stock instance (Show x, Show f) => Show (FunDef x f)
+
+data Program x f = Program [FunDef x f] (Block Void x f)
+  deriving stock (Show)
+
+data XReg
   = Zero
   | Ra
   | Sp
@@ -77,5 +121,51 @@ data Reg
   | T6
   deriving stock (Show, Eq, Enum)
 
-instance Buildable Reg where
-  build = ("x" <>) . intDec . fromEnum
+data FReg
+  = Ft0
+  | Ft1
+  | Ft2
+  | Ft3
+  | Ft4
+  | Ft5
+  | Ft6
+  | Ft7
+  | Fs0
+  | Fs1
+  | Fa0
+  | Fa1
+  | Fa2
+  | Fa3
+  | Fa4
+  | Fa5
+  | Fa6
+  | Fa7
+  | Fs2
+  | Fs3
+  | Fs4
+  | Fs5
+  | Fs6
+  | Fs7
+  | Fs8
+  | Fs9
+  | Fs10
+  | Fs11
+  | Ft8
+  | Ft9
+  | Ft10
+  | Ft11
+  deriving stock (Show, Eq, Enum)
+
+instance Buildable XReg where
+  build = string7 . fmap toLower . show
+
+instance Buildable FReg where
+  build = string7 . fmap toLower . show
+
+idOf :: Operand c x x -> x
+idOf (OpX i) = i
+idOf (OpF i) = i
+
+dstOf :: Operand c Id Id -> Operand c XReg FReg
+dstOf (OpX _) = OpX A0
+dstOf (OpF _) = OpF Fa0

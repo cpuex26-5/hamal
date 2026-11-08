@@ -1,6 +1,6 @@
 module Middleend.Opt.Beta (betaConvert) where
 
-import Data.Map qualified as M
+import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Log (Log, logMsg)

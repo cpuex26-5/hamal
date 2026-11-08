@@ -7,7 +7,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Cont (ContT (..), evalContT)
 import Data.Bitraversable (Bitraversable (bitraverse))
 import Data.Bool (bool)
-import Data.Map qualified as M
+import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Frontend.Syntax qualified as S

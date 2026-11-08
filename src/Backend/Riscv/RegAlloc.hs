@@ -1,53 +1,84 @@
 module Backend.Riscv.RegAlloc (regAlloc) where
 
-import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Program (..), Reg (..), RegClass (..))
-import Basic (Binder (..))
-import Data.Bifunctor (Bifunctor (bimap))
+import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), XReg (..), dstOf, idOf)
+import Control.Monad (zipWithM)
 import Name (Id)
 
-regAlloc :: Program Id -> Program Reg
-regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock block)
+data Restoring where
+  Restoring :: Operand c XReg FReg -> Id -> Restoring
+
+restoring :: Restoring -> Block c XReg FReg -> Block c XReg FReg
+restoring (Restoring op ident) = case op of
+  OpX {} -> Let (Just op) (Restore ident)
+  OpF {} -> Let (Just op) (FRestore ident)
+
+allocFun :: FunDef Id Id -> FunDef XReg FReg
+allocFun FunDef {binder, xargs, fargs, rhs, ret} =
+  FunDef
+    { binder
+    , xargs = fst <$> xregs
+    , fargs = fst <$> fregs
+    , rhs = storing (allocBlock rhs)
+    , ret
+    }
   where
-    binding = zip (enumFrom A0) -- TODO: assertion
-    restoring = foldr (\(reg, Binder {name, ty}) -> Let (Binder reg ty) (Restore name))
-    saving reg ident = Let (Binder Zero IReg) (Save reg ident)
-    storing = foldr (uncurry saving)
+    -- TODO: assertion
+    xregs = zip (enumFrom A0) xargs
+    fregs = zip (enumFrom Fa0) fargs
+    storing =
+      flip (foldr (\(x, ident) b -> Let Nothing (Save ident (OpX x)) b)) xregs
+        . flip (foldr (\(f, ident) b -> Let Nothing (Save ident (OpF f)) b)) fregs
 
-    allocFun :: FunDef Id -> FunDef Reg
-    allocFun FunDef {binder, args, rhs, ret} =
-      FunDef
-        { binder
-        , args = fst <$> binding args
-        , rhs = storing (allocBlock rhs) (binding args)
-        , ret
-        }
+allocInst :: Inst c Id Id -> ([Restoring], Inst c XReg FReg)
+allocInst = \case
+  Nop -> pure Nop
+  Li imm -> pure (Li imm)
+  La label -> pure (La label)
+  Mv (OpX x) -> Mv . OpX <$> rx T0 x
+  Mv (OpF f) -> Mv . OpF <$> rf Ft0 f
+  Add lhs rhs -> Add <$> rx T0 lhs <*> rx T1 rhs
+  Addi lhs imm -> Addi <$> rx T0 lhs <*> pure imm
+  Xori lhs imm -> Xori <$> rx T0 lhs <*> pure imm
+  Neg x -> Neg <$> rx T0 x
+  Sub lhs rhs -> Sub <$> rx T0 lhs <*> rx T1 rhs
+  Lw offset addr -> Lw offset <$> rx T0 addr
+  LwL offset label -> pure (LwL offset label)
+  Store (OpX x) addr offset -> Store . OpX <$> rx T0 x <*> rx T1 addr <*> pure offset
+  Store (OpF f) addr offset -> Store . OpF <$> rf Ft0 f <*> rx T1 addr <*> pure offset
+  StoreL (OpX x) label offset -> StoreL . OpX <$> rx T0 x <*> pure label <*> pure offset
+  StoreL (OpF f) label offset -> StoreL . OpF <$> rf Ft0 f <*> pure label <*> pure offset
+  If rel lhs rhs thn els -> If rel <$> rx T0 lhs <*> rx T1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
+  FIf rel lhs rhs thn els -> FIf rel <$> rf Ft0 lhs <*> rf Ft1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
+  CallDir fun xprms fprms -> CallDir fun <$> zipWithM rx [A0 .. A7] xprms <*> zipWithM rf [Fa0 .. Fa7] fprms
+  Save dst (OpX x) -> Save dst . OpX <$> rx T0 x
+  Save dst (OpF f) -> Save dst . OpF <$> rf Ft0 f
+  Restore ident -> pure $ Restore ident
+  FLi imm -> pure (FLi imm)
+  FNeg f -> FNeg <$> rf Ft0 f
+  FAdd lhs rhs -> FAdd <$> rf Ft0 lhs <*> rf Ft1 rhs
+  FSub lhs rhs -> FSub <$> rf Ft0 lhs <*> rf Ft1 rhs
+  FMul lhs rhs -> FMul <$> rf Ft0 lhs <*> rf Ft1 rhs
+  FDiv lhs rhs -> FDiv <$> rf Ft0 lhs <*> rf Ft1 rhs
+  FLw offset addr -> FLw offset <$> rx T0 addr
+  FLwL offset label -> pure (FLwL offset label)
+  FRestore ident -> pure $ FRestore ident
+  FloatOfInt x -> FloatOfInt <$> rx T0 x
+  IntOfFloat f -> IntOfFloat <$> rf Ft0 f
+  where
+    rx x ident = ([Restoring (OpX x) ident], x)
+    rf f ident = ([Restoring (OpF f) ident], f)
 
-    allocInst :: Inst Id -> (Inst Reg, [Binder Id RegClass])
-    allocInst = \case
-      Nop -> (Nop, [])
-      Li imm -> (Li imm, [])
-      La label -> (La label, [])
-      Mv ident -> (Mv T0, [int ident])
-      Add lhs rhs -> (Add T0 T1, [int lhs, int rhs])
-      Addi lhs imm -> (Addi T0 imm, [int lhs])
-      Neg ident -> (Neg T0, [int ident])
-      Sub lhs rhs -> (Sub T0 T1, [int lhs, int rhs])
-      Lw offset addr -> (Lw offset T0, [int addr])
-      Lwl offset label -> (Lwl offset label, [])
-      Sw dst src offset -> (Sw T0 T1 offset, [int dst, int src])
-      If cmp lhs rhs thn els -> (If cmp T0 T1 (allocBlock thn) (allocBlock els), [int lhs, int rhs])
-      CallDir fun params -> (CallDir fun (fst <$> binding params), int <$> params)
-      Save dst src -> (Save T0 src, [int dst])
-      Restore ident -> (Restore ident, [])
-      where
-        int ident = Binder ident IReg
+allocBlock :: Block c Id Id -> Block c XReg FReg
+allocBlock = \case
+  Ans inst -> foldr restoring (Ans inst') rs
+    where
+      (rs, inst') = allocInst inst
+  Let dstM inst body -> withRest . withEval . withSave $ allocBlock body
+    where
+      (rs, inst') = allocInst inst
+      withRest b = foldr restoring b rs -- inst のために T* に値を restore
+      withEval = Let (dstOf <$> dstM) inst' -- inst を実行し、必要なら A* に bind
+      withSave = maybe id (\b -> Let Nothing (Save (idOf b) (dstOf b))) dstM -- 必要なら A* から save
 
-    allocBlock :: Block Id -> Block Reg
-    allocBlock = \case
-      Ans inst -> withRestore T0 Ans inst
-      Let binder inst@CallDir {} body ->
-        withRestore A0 (\i -> Let (Binder A0 binder.ty) i (saving A0 binder.name (allocBlock body))) inst
-      Let binder inst body ->
-        withRestore T0 (\i -> Let (Binder T0 binder.ty) i (saving T0 binder.name (allocBlock body))) inst
-      where
-        withRestore startReg toBlock = uncurry restoring . bimap toBlock (zip (enumFrom startReg)) . allocInst
+regAlloc :: Program Id Id -> Program XReg FReg
+regAlloc (Program fundefs block) = Program (allocFun <$> fundefs) (allocBlock block)

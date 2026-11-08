@@ -30,7 +30,7 @@ instance Pretty Label where
 
 instance Buildable Label where
   build = \case
-    Local Id {unique, hint} -> shortByteString hint <> intDec unique
+    Local Id {unique, hint} -> shortByteString hint <> "." <> intDec unique
     Global sym -> shortByteString sym
 
 data Fresh :: Effect

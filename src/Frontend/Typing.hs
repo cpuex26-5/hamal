@@ -10,7 +10,7 @@ import Data.Bitraversable (Bitraversable (bitraverse))
 import Data.Foldable (traverse_)
 import Data.Functor (($>))
 import Data.List (uncons)
-import Data.Map qualified as M
+import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Error.Static (Error, throwError)
 import Effectful.Reader.Static (Reader, asks, local, runReader)

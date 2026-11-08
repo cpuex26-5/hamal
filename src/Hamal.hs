@@ -1,10 +1,10 @@
 module Hamal (Inspect (..), Phase (..), Stage (..), phase, compile, CompileError (..), phaseName) where
 
-import Backend.Riscv.Asm (Reg)
+import Backend.Riscv.Asm (FReg, XReg)
 import Backend.Riscv.Asm qualified as V
 import Backend.Riscv.Emit (emit)
 import Backend.Riscv.RegAlloc (regAlloc)
-import Backend.Riscv.Virtual (genVirtual)
+import Backend.Riscv.Virtual (virtualify)
 import Data.ByteString.Builder (Builder)
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Effectful (Dispatch (..), DispatchOf, Eff, Effect, (:>))
@@ -41,8 +41,8 @@ data Stage a where
   SBeta :: Stage K.Exp
   SAssoc :: Stage K.Exp
   SClosure :: Stage C.Program
-  SVirtual :: Stage (V.Program Id)
-  SRegAlloc :: Stage (V.Program Reg)
+  SVirtual :: Stage (V.Program Id Id)
+  SRegAlloc :: Stage (V.Program XReg FReg)
 
 phase :: Stage a -> Phase
 phase = \case
@@ -88,6 +88,6 @@ compile input = runFresh do
   beta <- stage SBeta . betaConvert $ knorm
   assoc <- stage SAssoc . pure . assocLet $ beta
   closure <- stage SClosure . pure . closureConvert $ assoc
-  virtual <- stage SVirtual . genVirtual $ closure
+  virtual <- stage SVirtual . virtualify $ closure
   regalloc <- stage SRegAlloc . pure . regAlloc $ virtual
   emit regalloc

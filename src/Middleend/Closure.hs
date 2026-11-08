@@ -1,8 +1,9 @@
 module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
 
 import Basic (Binder (..), Cmp, FunBind (..), PrimOp)
+import Control.Monad (unless)
 import Data.Bifunctor (first)
-import Data.Map as M
+import Data.Map.Strict as M hiding (null)
 import Data.Set qualified as S
 import Effectful (Eff, runPureEff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
@@ -70,6 +71,7 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . runReader (M.
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : args)
         body' <- local (with binder) (go body)
         formalFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable)" <> show name) name env}) <$> fv)
+        unless (null formalFv) (error "closure found")
         output $ FunDef {binder = first Local binder, args, formalFv, rhs = rhs'}
         pure body'
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap with binders) (go body)
