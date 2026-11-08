@@ -87,7 +87,7 @@ vPrimOp c e = case (c, e) of
   -- B.Put _ _ _ -> _
   (SFPR, B.FloatOfInt int) -> pure $ FloatOfInt int
   (SGPR, B.IntOfFloat float) -> pure $ IntOfFloat float
-  (SVoid, B.Out ident) -> pure $ StoreL (OpX ident) (Global "UART_BASE") 0
+  (SVoid, B.Out ident) -> pure $ Out ident
   _ -> error "virtualOp(unreachable)"
 
 vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)

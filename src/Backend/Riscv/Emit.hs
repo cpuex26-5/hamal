@@ -51,23 +51,31 @@ emitNonTail rdM = \case
   Mv rs -> case rs of
     OpX x -> for_ (xreg rdM) \rd -> emitI "mv" [build rd, build x]
     OpF f -> for_ (freg rdM) \rd -> emitI "fmv.s" [build rd, build f]
+  Neg rs -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build Zero, build rs]
   Add rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "add" [build rd, build rs1, build rs2]
   Addi rs1 imm -> for_ (xreg rdM) \rd -> emitI "addi" [build rd, build rs1, BB.intDec imm]
   Xori rs1 imm -> for_ (xreg rdM) \rd -> emitI "xori" [build rd, build rs1, BB.intDec imm]
-  Neg rs -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build Zero, build rs]
   Sub rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build rs1, build rs2]
   Lw offset rs -> for_ (xreg rdM) \rd -> emitI "lw" [build rd, memFormat offset rs]
   LwL offset label -> for_ (xreg rdM) \rd -> do
-    emitI "la" [build T0, build label]
-    emitI "lw" [build rd, memFormat offset T0]
+    emitI "la" [build T1, build label]
+    emitI "lw" [build rd, memFormat offset T1]
   Store rs addr offset -> case rs of
     OpX x -> emitI "sw" [build x, memFormat offset addr]
     OpF f -> emitI "fsw" [build f, memFormat offset addr]
   StoreL rs label offset -> do
-    emitI "la" [build T0, build label]
+    emitI "la" [build T1, build label]
     case rs of
-      OpX x -> emitI "sw" [build x, memFormat offset T0]
-      OpF f -> emitI "fsw" [build f, memFormat offset T0]
+      OpX x -> emitI "sw" [build x, memFormat offset T1]
+      OpF f -> emitI "fsw" [build f, memFormat offset T1]
+  Save ident rs -> do
+    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
+    case rs of
+      OpX x -> emitI "sw" [build x, memFormat offset Sp]
+      OpF f -> emitI "fsw" [build f, memFormat offset Sp]
+  Restore ident -> for_ (xreg rdM) \rd -> do
+    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
+    emitI "lw" [build rd, memFormat offset Sp]
   If rel lhs rhs thn els -> do
     label_else <- Local <$> fresh "else"
     label_cont <- Local <$> fresh "cont"
@@ -95,8 +103,8 @@ emitNonTail rdM = \case
           Le -> "fle.s"
           Gt -> "fgt.s"
           Ge -> "fge.s"
-    emitI s [build T0, build lhs, build rhs]
-    emitI "beqz" [build T0, build label_else]
+    emitI s [build T1, build lhs, build rhs]
+    emitI "beqz" [build T1, build label_else]
     emitBlock (NonTail rdM) thn
     emitI "j" [build label_cont]
     emitL label_else
@@ -108,12 +116,6 @@ emitNonTail rdM = \case
     for_ rdM \case
       OpX x -> emitI "mv" [build x, build A0]
       OpF f -> emitI "fmv.s" [build f, build Fa0]
-  Save ident rs -> do
-    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
-    emitI "sw" [build rs, memFormat offset Sp]
-  Restore ident -> for_ (xreg rdM) \rd -> do
-    offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
-    emitI "lw" [build rd, memFormat offset Sp]
   FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
   FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
@@ -121,18 +123,22 @@ emitNonTail rdM = \case
   FDiv lhs rhs -> for_ (freg rdM) \rd -> emitI "fdiv.s" [build rd, build lhs, build rhs]
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
   FLwL offset label -> for_ (freg rdM) \rd -> do
-    emitI "la" [build T0, build label]
-    emitI "flw" [build rd, memFormat offset T0]
+    emitI "la" [build T1, build label]
+    emitI "flw" [build rd, memFormat offset T1]
   FRestore ident -> for_ (freg rdM) \rd -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
     emitI "flw" [build rd, memFormat offset Sp]
   FloatOfInt rs -> for_ (freg rdM) \rd -> emitI "fcvt.s.w" [build rd, build rs]
   IntOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fcvt.w.s" [build rd, build rs]
+  Out rs -> do
+    emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
+    emitI "sw" [build rs, memFormat 0 T1]
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
     xreg = fmap \(OpX r) -> r
     freg :: Maybe (Operand FPR XReg FReg) -> Maybe FReg
     freg = fmap \(OpF r) -> r
+    mmioBase = 0xffff0
 
 emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest c -> Block c XReg FReg -> Eff es ()
 emitBlock dest = \case
@@ -161,7 +167,7 @@ emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
 emit (Program floats fundefs block) = execWriter do
   tell @BB.Builder ".section\t.rodata\n"
   forM_ floats \(float, label) ->
-    tell @BB.Builder $ "." <> build label <> ":\t.word 0x" <> BB.floatHexFixed float <> "\t# " <> BB.floatDec float <> "\n"
+    tell @BB.Builder $ build label <> ":\t.word 0x" <> BB.floatHexFixed float <> "\t# " <> BB.floatDec float <> "\n"
   tell @BB.Builder ".section\t.text\n"
   tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun main

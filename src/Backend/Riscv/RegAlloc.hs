@@ -36,10 +36,10 @@ allocInst = \case
   La label -> pure (La label)
   Mv (OpX x) -> Mv . OpX <$> rx T0 x
   Mv (OpF f) -> Mv . OpF <$> rf Ft0 f
+  Neg x -> Neg <$> rx T0 x
   Add lhs rhs -> Add <$> rx T0 lhs <*> rx T1 rhs
   Addi lhs imm -> Addi <$> rx T0 lhs <*> pure imm
   Xori lhs imm -> Xori <$> rx T0 lhs <*> pure imm
-  Neg x -> Neg <$> rx T0 x
   Sub lhs rhs -> Sub <$> rx T0 lhs <*> rx T1 rhs
   Lw offset addr -> Lw offset <$> rx T0 addr
   LwL offset label -> pure (LwL offset label)
@@ -63,6 +63,7 @@ allocInst = \case
   FRestore ident -> pure $ FRestore ident
   FloatOfInt x -> FloatOfInt <$> rx T0 x
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f
+  Out x -> Out <$> rx T0 x
   where
     rx x ident = ([Restoring (OpX x) ident], x)
     rf f ident = ([Restoring (OpF f) ident], f)

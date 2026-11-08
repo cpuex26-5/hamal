@@ -25,9 +25,9 @@ data Operand (c :: RegClass) x f where
 
 deriving stock instance (Show x, Show f) => Show (Operand c x f)
 
-instance (Buildable x, Buildable f) => Buildable (Operand c x f) where
-  build (OpX x) = build x
-  build (OpF f) = build f
+-- instance (Buildable x, Buildable f) => Buildable (Operand c x f) where
+--   build (OpX x) = build x
+--   build (OpF f) = build f
 
 data Block (c :: RegClass) x f where
   Ans :: Inst c x f -> Block c x f
@@ -43,6 +43,7 @@ data Inst (c :: RegClass) x f where
   StoreL :: Operand c x f -> Label -> Int -> Inst Void x f
   CallDir :: Label -> [x] -> [f] -> Inst c x f
   Save :: Id -> Operand c x f -> Inst Void x f
+  Out :: x -> Inst Void x f
   -- GPR
   Li :: Int -> Inst GPR x f
   La :: Label -> Inst GPR x f

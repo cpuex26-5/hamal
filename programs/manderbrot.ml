@@ -27,6 +27,7 @@ let rec yloop y =
         xloop (x + 1) y)
     in
     xloop 0 y;
+    print_char 10; (* '\n' *)
     yloop (y + 1))
 in
 yloop 0
