@@ -80,7 +80,7 @@ deriveBifunctor ''Binder
 deriveBifoldable ''Binder
 deriveBitraversable ''Binder
 
-data FunBind b r = FunBind {binder :: b, args :: [b], rhs :: r}
+data FunBind b r = FunBind {binder :: b, params :: [b], rhs :: r}
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 (FunBind b)
 

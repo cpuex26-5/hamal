@@ -74,8 +74,8 @@ deriving stock instance (Show x, Show f) => Show (Inst c x f)
 data FunDef x f where
   FunDef ::
     { binder :: Label
-    , xargs :: [x]
-    , fargs :: [f]
+    , xparams :: [x]
+    , fparams :: [f]
     , rhs :: Block c x f
     , ret :: SingClass c
     } ->

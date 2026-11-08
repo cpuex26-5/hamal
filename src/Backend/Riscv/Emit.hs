@@ -182,8 +182,8 @@ emit (Program floats fundefs block) = execWriter do
     main =
       FunDef
         { binder = Global "min_caml_start"
-        , xargs = []
-        , fargs = []
+        , xparams = []
+        , fparams = []
         , rhs = block
         , ret = SVoid
         }

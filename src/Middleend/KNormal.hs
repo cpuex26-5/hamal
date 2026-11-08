@@ -45,10 +45,10 @@ instance Pretty Exp where
       group (nest 2 ("let" <+> pretty binder <+> "=" <> line <> pretty rhs) <> line <> "in")
         <> hardline
         <> pretty body
-    LetRec FunBind {binder, args, rhs} body ->
-      nest 2 ("let rec" <+> pretty binder.name <+> hsep (parens . pretty <$> args) <+> "=" <> line <> pretty rhs) <> hardline <> "in" <> hardline <> pretty body
+    LetRec FunBind {binder, params, rhs} body ->
+      nest 2 ("let rec" <+> pretty binder.name <+> hsep (parens . pretty <$> params) <+> "=" <> line <> pretty rhs) <> hardline <> "in" <> hardline <> pretty body
     LetTuple binders rhs body -> "let" <+> tupled (pretty <$> binders) <+> "=" <+> pretty rhs <+> "in" <> hardline <> pretty body
-    App fun params -> hsep (pretty fun : (pretty <$> params))
+    App fun args -> hsep (pretty fun : (pretty <$> args))
 
 insertLet :: (Fresh :> es) => Type -> Eff es Exp -> (Id -> Eff es Exp) -> Eff es Exp
 insertLet ty scrutM k = do
@@ -77,12 +77,12 @@ go expr@(_ :< t) = evalContT $ case t of
     rhs' <- lift (go rhs)
     binder' <- bind binder
     Let binder' rhs' <$> lift (go body)
-  S.LetRec FunBind {binder, args, rhs} body -> do
+  S.LetRec FunBind {binder, params, rhs} body -> do
     binder' <- bind binder
-    (args', rhs') <- lift . evalContT $ do
-      args' <- traverse bind args
-      (args',) <$> lift (go rhs)
-    LetRec FunBind {binder = binder', args = args', rhs = rhs'} <$> lift (go body)
+    (params', rhs') <- lift . evalContT $ do
+      params' <- traverse bind params
+      (params',) <$> lift (go rhs)
+    LetRec FunBind {binder = binder', params = params', rhs = rhs'} <$> lift (go body)
   S.App fun params -> App <$> atomize fun <*> traverse atomize params
   S.LetTuple binders rhs body -> do
     rhs' <- atomize rhs

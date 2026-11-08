@@ -76,9 +76,9 @@ vInst c e = case (c, e) of
   (SGPR, C.Var ident) -> pure $ Mv (OpX ident)
   (SFPR, C.Var ident) -> pure $ Mv (OpF ident)
   (SVoid, C.Var _) -> pure Nop
-  (_, C.AppDir label params) ->
+  (_, C.AppDir label args) ->
     uncurry (CallDir label) . partitionByClass
-      <$> traverse (\n -> (n,) <$> classOfVar n) params
+      <$> traverse (\n -> (n,) <$> classOfVar n) args
   _ -> error $ "vInst(unreachable): " <> show (c, e)
   where
     classOfVar = asks . M.findWithDefault (error "unreachable")
@@ -103,9 +103,9 @@ vPrimOp c e = case (c, e) of
   _ -> error $ "virtualOp(unreachable): " <> show (c, e)
 
 vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)
-vFunc C.FunDef {binder, args, formalFv, rhs} = case binder.ty of
+vFunc C.FunDef {binder, params, formalFv, rhs} = case binder.ty of
   T.Type (T.Fun _ ret) | SomeClass c <- classOf (T.Type ret) -> do
-    let env = M.fromList [(b.name, classOf b.ty) | b <- args <> formalFv]
+    let env = M.fromList [(b.name, classOf b.ty) | b <- params <> formalFv]
     rhs' <- runReader env (vBlock c rhs)
     let load =
           foldr
@@ -116,8 +116,8 @@ vFunc C.FunDef {binder, args, formalFv, rhs} = case binder.ty of
             )
             rhs'
             (zip formalFv [4, 4 ..])
-    let (xargs, fargs) = partitionByClass [(b.name, classOf b.ty) | b <- args]
-    pure $ FunDef {binder = binder.name, xargs, fargs, rhs = load, ret = c}
+    let (xparams, fparams) = partitionByClass [(b.name, classOf b.ty) | b <- params]
+    pure $ FunDef {binder = binder.name, xparams, fparams, rhs = load, ret = c}
   _ -> error "unreachable"
 
 virtualify :: (Fresh :> es) => C.Program -> Eff es (Program Id Id)

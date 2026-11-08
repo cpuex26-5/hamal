@@ -9,9 +9,9 @@ xargRegs = [A0 .. A7]
 fargRegs :: [FReg]
 fargRegs = [Fa0 .. Fa7]
 
-assignArgs :: [a] -> [b] -> [(a, b)]
-assignArgs regs args
-  | length regs <= length args = zip regs args
+assignRegs :: [a] -> [b] -> [(a, b)]
+assignRegs regs args
+  | length regs >= length args = zip regs args
   | otherwise = error "assignArgs: too many arguments"
 
 data Restoring where
@@ -23,17 +23,17 @@ restoring (Restoring op ident) = case op of
   OpF {} -> Let (Just op) (FRestore ident)
 
 allocFun :: FunDef Id Id -> FunDef XReg FReg
-allocFun FunDef {binder, xargs, fargs, rhs, ret} =
+allocFun FunDef {binder, xparams, fparams, rhs, ret} =
   FunDef
     { binder
-    , xargs = fst <$> xpairs
-    , fargs = fst <$> fpairs
+    , xparams = fst <$> xpairs
+    , fparams = fst <$> fpairs
     , rhs = foldr (Let Nothing) (allocBlock rhs) saves
     , ret
     }
   where
-    xpairs = assignArgs xargRegs xargs
-    fpairs = assignArgs fargRegs fargs
+    xpairs = assignRegs xargRegs xparams
+    fpairs = assignRegs fargRegs fparams
     saves = [Save i (OpX x) | (x, i) <- xpairs] <> [Save i (OpF f) | (f, i) <- fpairs]
 
 allocInst :: Inst c Id Id -> ([Restoring], Inst c XReg FReg)
@@ -58,10 +58,10 @@ allocInst = \case
   StoreL (OpF f) label offset -> StoreL . OpF <$> rf Ft0 f <*> pure label <*> pure offset
   If rel lhs rhs thn els -> If rel <$> rx T0 lhs <*> rx T1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
   FIf rel lhs rhs thn els -> FIf rel <$> rf Ft0 lhs <*> rf Ft1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
-  CallDir fun xprms fprms ->
+  CallDir fun xargs fargs ->
     CallDir fun
-      <$> traverse (uncurry rx) (assignArgs xargRegs xprms)
-      <*> traverse (uncurry rf) (assignArgs fargRegs fprms)
+      <$> traverse (uncurry rx) (assignRegs xargRegs xargs)
+      <*> traverse (uncurry rf) (assignRegs fargRegs fargs)
   Save dst (OpX x) -> Save dst . OpX <$> rx T0 x
   Save dst (OpF f) -> Save dst . OpF <$> rf Ft0 f
   Restore ident -> pure $ Restore ident

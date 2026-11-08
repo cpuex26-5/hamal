@@ -35,7 +35,7 @@ data Exp
 
 data FunDef = FunDef
   { binder :: Binder Label Type
-  , args :: [Binder Id Type]
+  , params :: [Binder Id Type]
   , formalFv :: [Binder Id Type]
   , rhs :: Exp
   }
@@ -51,7 +51,7 @@ freeVars = \case
   PrimOp op -> foldMap S.singleton op
   If _ lhs rhs thn els -> S.singleton lhs <> S.singleton rhs <> freeVars thn <> freeVars els
   Let binder rhs body -> S.difference (freeVars rhs <> freeVars body) $ S.singleton binder.name
-  AppDir _ params -> S.fromList params
+  AppDir _ args -> S.fromList args
   LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList ((.name) <$> binders)
 
 closureConvert :: K.Exp -> Program
@@ -66,14 +66,14 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . runReader (M.
       K.PrimOp op -> pure $ PrimOp op
       K.If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
       K.Let binder rhs body -> Let binder <$> go rhs <*> local (with binder) (go body)
-      K.LetRec FunBind {binder, args, rhs} body -> do
-        rhs' <- local (foldMap with (binder : args)) (go rhs)
-        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : args)
+      K.LetRec FunBind {binder, params, rhs} body -> do
+        rhs' <- local (foldMap with (binder : params)) (go rhs)
+        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : params)
         body' <- local (with binder) (go body)
         formalFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable)" <> show name) name env}) <$> fv)
         unless (null formalFv) (error "closure found")
-        output $ FunDef {binder = first Local binder, args, formalFv, rhs = rhs'}
+        output $ FunDef {binder = first Local binder, params, formalFv, rhs = rhs'}
         pure body'
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap with binders) (go body)
-      K.App fun params -> pure $ AppDir (Local fun) params
+      K.App fun args -> pure $ AppDir (Local fun) args
     with binder = M.insert binder.name binder.ty

@@ -102,9 +102,9 @@ infer (sspan :< expr) = case expr of
     with [Binder {name, ty}] do
       body' <- infer body
       pure $ (sspan, typeof body') :< S.Let Binder {name, ty} rhs' body'
-  S.LetRec FunBind {binder = Binder {name}, args, rhs} body -> do
+  S.LetRec FunBind {binder = Binder {name}, params, rhs} body -> do
     ret <- freshTy
-    args' <- traverse annotate args
+    args' <- traverse annotate params
     let binder = Binder {name, ty = T.Fun ((.ty) <$> args') ret}
     rhs' <- with (binder : args') do
       rhs' <- infer rhs
@@ -112,7 +112,7 @@ infer (sspan :< expr) = case expr of
       pure rhs'
     with [binder] do
       body' <- infer body
-      pure $ (sspan, typeof body') :< S.LetRec FunBind {binder, args = args', rhs = rhs'} body'
+      pure $ (sspan, typeof body') :< S.LetRec FunBind {binder, params = args', rhs = rhs'} body'
   S.LetTuple binders rhs body -> do
     binders' <- traverse annotate binders
     rhs' <- infer rhs
@@ -120,17 +120,17 @@ infer (sspan :< expr) = case expr of
     with binders' do
       body' <- infer body
       pure $ (sspan, typeof body') :< S.LetTuple binders' rhs' body'
-  S.App fun@(_ :< S.Var sym) params -> do
+  S.App fun@(_ :< S.Var sym) args -> do
     bound <- asks @Env (M.member sym)
     case lookup sym builtins of
       Just shape
         | not bound ->
             maybe
-              (throwError (BuiltinArity sspan sym (length shape) (length params)))
+              (throwError (BuiltinArity sspan sym (length shape) (length args)))
               (infer . (sspan :<) . S.PrimOp)
-              (fill shape params)
-      _ -> inferApp fun params
-  S.App fun params -> inferApp fun params
+              (fill shape args)
+      _ -> inferApp fun args
+  S.App fun args -> inferApp fun args
   where
     with binders = local (M.union $ M.fromList [(name, ty) | Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
@@ -154,12 +154,12 @@ infer (sspan :< expr) = case expr of
       B.FloatOfInt ty -> ty `ascribe` T.Int $> T.Float
       B.IntOfFloat ty -> ty `ascribe` T.Float $> T.Int
       B.Out ty -> ty `ascribe` T.Int $> T.Unit
-    inferApp fun params = do
+    inferApp fun args = do
       fun' <- infer fun
-      params' <- mapM infer params
+      args' <- mapM infer args
       ty <- freshTy
-      fun' `ascribe` T.Fun (typeof <$> params') ty
-      pure $ (sspan, ty) :< S.App fun' params'
+      fun' `ascribe` T.Fun (typeof <$> args') ty
+      pure $ (sspan, ty) :< S.App fun' args'
     builtins =
       [ ("not", Not ())
       , ("Array.create", Array () ())

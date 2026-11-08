@@ -26,7 +26,7 @@ instance Monad TypeF where
     Int -> Int
     Float -> Float
     Tuple tys -> Tuple ((>>= k) <$> tys)
-    Fun args body -> Fun ((>>= k) <$> args) (body >>= k)
+    Fun dom cod -> Fun ((>>= k) <$> dom) (cod >>= k)
     Array ty -> Array (ty >>= k)
     Var ty -> k ty
 

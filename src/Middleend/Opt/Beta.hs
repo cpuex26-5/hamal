@@ -25,7 +25,7 @@ betaConvert = runReader (M.empty :: Env) . go
           rhs' -> Let binder rhs' <$> go body
       Var ident -> Var <$> beta ident
       LetRec funbind body -> LetRec <$> traverse go funbind <*> go body
-      App fun params -> App <$> beta fun <*> traverse beta params
+      App fun args -> App <$> beta fun <*> traverse beta args
       LetTuple binders rhs body -> LetTuple binders <$> beta rhs <*> go body
       where
         beta ident = asks (M.findWithDefault ident ident)
