@@ -26,8 +26,8 @@ runInspect opts = interpret_ \(Inspect s x) ->
       SParsed -> pSimple x
       STyped -> pSimple x
       SKNormal -> pCustom x
-      SBeta -> pCustom x
-      SAssoc -> pCustom x
+      SBeta {} -> pCustom x
+      SAssoc {} -> pCustom x
       SClosure -> pSimple x
       SVirtual -> pSimple x
       SRegAlloc -> pSimple x
@@ -40,7 +40,7 @@ main :: IO ()
 main = do
   opts <- execParser $ info (optionsP <**> helper) (fullDesc <> progDesc "Hamal: A MinCaml compiler writtern in Haskell.")
   input <- BS.getContents
-  m <- runEff . runErrorNoCallStack @CompileError . runInspect opts . runLog opts.verbose . compile $ input
+  m <- runEff . runErrorNoCallStack @CompileError . runInspect opts . runLog opts.verbose . compile opts.iter $ input
   case m of
     Left (ParseError msg) -> hPutStrLn stderr msg >> exitFailure
     Left (TypeError typeError) -> hPrint stderr typeError >> exitFailure

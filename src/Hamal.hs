@@ -5,6 +5,7 @@ import Backend.Riscv.Asm qualified as V
 import Backend.Riscv.Emit (emit)
 import Backend.Riscv.RegAlloc (regAlloc)
 import Backend.Riscv.Virtual (virtualify)
+import Control.Monad (foldM)
 import Data.ByteString.Builder (Builder)
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Effectful (Dispatch (..), DispatchOf, Eff, Effect, (:>))
@@ -14,7 +15,7 @@ import Frontend.Lexer (runAlex)
 import Frontend.Parser (parse)
 import Frontend.Syntax (Parsed, Typed)
 import Frontend.Typing (TypeError, typing)
-import Log (Log)
+import Log (Log, logMsg)
 import Middleend.Closure (closureConvert)
 import Middleend.Closure qualified as C
 import Middleend.KNormal (kNormal)
@@ -38,8 +39,8 @@ data Stage a where
   SParsed :: Stage Parsed
   STyped :: Stage Typed
   SKNormal :: Stage K.Exp
-  SBeta :: Stage K.Exp
-  SAssoc :: Stage K.Exp
+  SBeta :: Int -> Stage K.Exp
+  SAssoc :: Int -> Stage K.Exp
   SClosure :: Stage C.Program
   SVirtual :: Stage (V.Program Id Id)
   SRegAlloc :: Stage (V.Program XReg FReg)
@@ -49,8 +50,8 @@ phase = \case
   SParsed -> Parsed
   STyped -> Typed
   SKNormal -> KNormal
-  SBeta -> Beta
-  SAssoc -> Assoc
+  SBeta {} -> Beta
+  SAssoc {} -> Assoc
   SClosure -> Closure
   SVirtual -> Virtual
   SRegAlloc -> RegAlloc
@@ -80,14 +81,24 @@ stage s m = do
   send (Inspect s x)
   pure x
 
-compile :: (Error CompileError :> es, Inspect :> es, Log :> es) => ByteString -> Eff es Builder
-compile input = runFresh do
+compile :: (Error CompileError :> es, Inspect :> es, Log :> es) => Int -> ByteString -> Eff es Builder
+compile limit input = runFresh do
   syntax <- stage SParsed . either (throwError . ParseError) pure $ runAlex input parse
   typed <- stage STyped . runErrorNoCallStackWith (throwError . TypeError) $ typing syntax
   knorm <- stage SKNormal . kNormal $ typed
-  beta <- stage SBeta . betaConvert $ knorm
-  assoc <- stage SAssoc . pure . assocLet $ beta
-  closure <- stage SClosure . pure . closureConvert $ assoc
+  middle <- optimize limit knorm
+  closure <- stage SClosure . pure . closureConvert $ middle
   virtual <- stage SVirtual . virtualify $ closure
   regalloc <- stage SRegAlloc . pure . regAlloc $ virtual
   emit regalloc
+
+optimize :: (Inspect :> es, Log :> es) => Int -> K.Exp -> Eff es K.Exp
+optimize limit = go 1
+  where
+    go iter knorm
+      | iter > limit = pure knorm
+      | otherwise = do
+          logMsg $ "iteration #" <> show iter
+          next <- foldM (\e (stg, pass) -> stage (stg iter) $ pass e) knorm passes
+          if knorm == next then pure next else go (iter + 1) next
+    passes = [(SBeta, betaConvert), (SAssoc, pure . assocLet)]
