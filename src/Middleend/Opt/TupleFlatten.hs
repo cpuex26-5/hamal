@@ -6,12 +6,25 @@ import Basic (
  )
 import Control.Monad (when, zipWithM)
 import Data.Map.Strict qualified as M
+import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Log (Log, logMsg)
 import Middleend.KNormal (Exp (..), FunBind (..))
 import Name (Fresh, Id, refresh)
 import Type qualified as T
+
+unknownFun :: Exp -> S.Set Id
+unknownFun = go S.empty
+  where
+    go :: S.Set Id -> Exp -> S.Set Id
+    go env = \case
+      (Unit; Int {}; Float {}; Var {}; PrimOp {}) -> S.empty
+      If _ _ _ cnd thn -> go env cnd <> go env thn
+      Let _ rhs body -> go env rhs <> go env body
+      LetRec funbind body -> go (S.insert funbind.binder.name env) body
+      LetTuple _ _ body -> go env body
+      App _ args -> S.fromList $ filter (\arg -> S.member arg env) args
 
 data ParamPos = Keep | Spread [T.Type]
 
@@ -23,16 +36,17 @@ spread name = \case
   Spread tys -> Just <$> traverse (\ty -> Binder <$> refresh name <*> pure ty) tys
 
 flattenArgs :: (Log :> es, Fresh :> es) => Exp -> Eff es Exp
-flattenArgs = runReader @Env M.empty . go
+flattenArgs expr = runReader @Env M.empty (go expr)
   where
+    unknowns = unknownFun expr
     go :: (Log :> es, Fresh :> es, Reader Env :> es) => Exp -> Eff es Exp
     go = \case
       e@(Unit; Int {}; Float {}; Var {}; PrimOp {}) -> pure e
       If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
       Let binder rhs body -> Let binder <$> go rhs <*> go body
       LetTuple binders rhs body -> LetTuple binders rhs <$> go body
+      LetRec fb body | (fb.binder.name `S.member` unknowns) -> LetRec fb <$> go body
       LetRec FunBind {binder, params, rhs} body -> do
-        -- TODO: escape check
         -- TODO: limit # of params
         let ps = genPos <$> params
         ms <- zipWithM (\param -> spread param.name) params ps
