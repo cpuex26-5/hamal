@@ -1,4 +1,4 @@
-module Middleend.Opt.TupleFlatten (flattenArgs) where
+module Middleend.Opt.TupleFlatten (flattenArgs, flattenLetTuple) where
 
 import Basic (
   Binder (..),
@@ -47,7 +47,6 @@ flattenArgs expr = runReader @Env M.empty (go expr)
       LetTuple binders rhs body -> LetTuple binders rhs <$> go body
       LetRec fb body | (fb.binder.name `S.member` unknowns) -> LetRec fb <$> go body
       LetRec FunBind {binder, params, rhs} body -> do
-        -- TODO: limit # of params
         let ps = genPos <$> params
         ms <- zipWithM (\param -> spread param.name) params ps
         let params' = concat $ zipWith (\param -> maybe [param] id) params ms
@@ -77,3 +76,20 @@ flattenArgs expr = runReader @Env M.empty (go expr)
               (\(arg, m) k -> maybe k (\binders -> LetTuple binders arg k) m)
               (App fun args')
               (zip args ms)
+
+flattenLetTuple :: Exp -> Exp
+flattenLetTuple = go M.empty
+  where
+    go env = \case
+      e@(Unit; Int {}; Float {}; Var {}; PrimOp {}; App {}) -> e
+      If cmp lhs rhs thn els -> If cmp lhs rhs (go env thn) (go env els)
+      LetRec FunBind {binder, params, rhs} body -> LetRec FunBind {binder, params, rhs = go env rhs} (go env body)
+      Let binder rhs@(PrimOp (Tuple idents)) body -> Let binder rhs $ go (M.insert binder.name idents env) body
+      Let binder rhs body -> Let binder rhs (go env body)
+      LetTuple binders rhs body
+        | Just untupling <- M.lookup rhs env ->
+            foldr
+              (\(binder, ident) k -> Let binder (Var ident) k)
+              (go env body)
+              (zip binders untupling)
+      LetTuple binders rhs body -> LetTuple binders rhs (go env body)
