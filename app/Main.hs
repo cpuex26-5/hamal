@@ -42,7 +42,7 @@ runInspect opts = interpret_ \(Inspect s x) ->
 
 main :: IO ()
 main = do
-  opts <- execParser $ info (optionsP <**> helper) (fullDesc <> progDesc "Hamal: A MinCaml compiler writtern in Haskell.")
+  opts <- execParser $ info (optionsP <**> helper) (fullDesc <> progDesc "Hamal: A MinCaml compiler written in Haskell.")
   input <- BS.getContents
   m <- runEff . runErrorNoCallStack @CompileError . runInspect opts . runLog opts.verbose . compile opts.iter $ input
   case m of
