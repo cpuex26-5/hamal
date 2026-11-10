@@ -16,7 +16,7 @@ isPure = \case
   PrimOp op -> isPureOp op
   If _ _ _ thn els -> isPure thn && isPure els
   Let _ rhs body -> isPure rhs && isPure body
-  LetRec FunBind {rhs} body -> isPure rhs && isPure body
+  LetRec _ body -> isPure body
   LetTuple _ _ body -> isPure body
   App {} -> False
   where
@@ -27,32 +27,24 @@ isPure = \case
 elimDeadCode :: (Log :> es) => Exp -> Eff es Exp
 elimDeadCode = go
   where
+    prune live binder kept body
+      | live = pure kept
+      | otherwise = do
+          logMsg $ "eliminating variable: " <> show binder
+          pure body
+
     go = \case
       e@(Unit; Int {}; Float {}; Var {}; PrimOp {}; App {}) -> pure e
       If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
       Let binder rhs body -> do
         rhs' <- go rhs
         body' <- go body
-        if (not (isPure rhs') || binder.name `S.member` (freeVars body'))
-          then
-            pure (Let binder rhs' body')
-          else do
-            logMsg $ "eliminating variable: " <> show binder
-            pure body'
+        prune (not (isPure rhs') || binder.name `S.member` (freeVars body')) binder (Let binder rhs' body') body'
       LetRec fb@FunBind {binder, rhs} body -> do
         rhs' <- go rhs
         body' <- go body
-        if (binder.name `S.member` (freeVars body'))
-          then pure $ LetRec fb {rhs = rhs'} body'
-          else do
-            logMsg $ "eliminating variable: " <> show binder
-            pure body'
+        prune (binder.name `S.member` (freeVars body')) binder (LetRec fb {rhs = rhs'} body') body'
       LetTuple binders rhs body -> do
         body' <- go body
         let bodyFv = freeVars body'
-        if (any (\b -> b.name `S.member` bodyFv) binders)
-          then
-            pure $ LetTuple binders rhs body'
-          else do
-            logMsg $ "eliminating variable: " <> show binders
-            pure body'
+        prune (any (\b -> b.name `S.member` bodyFv) binders) binders (LetTuple binders rhs body') body'
