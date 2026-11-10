@@ -10,7 +10,7 @@ import Name (Id)
 type Env = M.Map Id Id
 
 betaConvert :: (Log :> es) => Exp -> Eff es Exp
-betaConvert = runReader (M.empty :: Env) . go
+betaConvert = runReader @Env M.empty . go
   where
     go :: (Log :> es, Reader Env :> es) => Exp -> Eff es Exp
     go = \case

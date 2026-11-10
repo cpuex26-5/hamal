@@ -22,12 +22,14 @@ import Middleend.KNormal (kNormal)
 import Middleend.KNormal qualified as K
 import Middleend.Opt.Assoc (assocLet)
 import Middleend.Opt.Beta (betaConvert)
-import Name (Id, runFresh)
+import Middleend.Opt.TupleFlatten (flattenArgs)
+import Name (Fresh, Id, runFresh)
 
 data Phase
   = Parsed
   | Typed
   | KNormal
+  | TupleFlatten
   | Beta
   | Assoc
   | Closure
@@ -39,6 +41,7 @@ data Stage a where
   SParsed :: Stage Parsed
   STyped :: Stage Typed
   SKNormal :: Stage K.Exp
+  STupleFlatten :: Int -> Stage K.Exp
   SBeta :: Int -> Stage K.Exp
   SAssoc :: Int -> Stage K.Exp
   SClosure :: Stage C.Program
@@ -50,6 +53,7 @@ phase = \case
   SParsed -> Parsed
   STyped -> Typed
   SKNormal -> KNormal
+  STupleFlatten {} -> TupleFlatten
   SBeta {} -> Beta
   SAssoc {} -> Assoc
   SClosure -> Closure
@@ -61,6 +65,7 @@ phaseName = \case
   Parsed -> "parsed"
   Typed -> "typed"
   KNormal -> "knorm"
+  TupleFlatten -> "flatten"
   Beta -> "beta"
   Assoc -> "assoc"
   Closure -> "closure"
@@ -92,7 +97,7 @@ compile limit input = runFresh do
   regalloc <- stage SRegAlloc . pure . regAlloc $ virtual
   emit regalloc
 
-optimize :: (Inspect :> es, Log :> es) => Int -> K.Exp -> Eff es K.Exp
+optimize :: (Fresh :> es, Inspect :> es, Log :> es) => Int -> K.Exp -> Eff es K.Exp
 optimize limit = go 1
   where
     go iter knorm
@@ -101,4 +106,4 @@ optimize limit = go 1
           logMsg $ "iteration #" <> show iter
           next <- foldM (\e (stg, pass) -> stage (stg iter) $ pass e) knorm passes
           if knorm == next then pure next else go (iter + 1) next
-    passes = [(SBeta, betaConvert), (SAssoc, pure . assocLet)]
+    passes = [(STupleFlatten, flattenArgs), (SBeta, betaConvert), (SAssoc, pure . assocLet)]

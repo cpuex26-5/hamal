@@ -26,6 +26,7 @@ runInspect opts = interpret_ \(Inspect s x) ->
       SParsed -> pSimple x
       STyped -> pSimple x
       SKNormal -> pCustom x
+      STupleFlatten {} -> pCustom x
       SBeta {} -> pCustom x
       SAssoc {} -> pCustom x
       SClosure -> pSimple x
