@@ -21,17 +21,19 @@ import Text.Pretty.Simple qualified as P
 runInspect :: (IOE :> es) => Options -> Eff (Inspect : es) a -> Eff es a
 runInspect opts = interpret_ \(Inspect s x) ->
   when (phase s `S.member` opts.dumps) $ do
-    liftIO $ hPutStrLn stderr $ "==================== " <> phaseName (phase s) <> " ===================="
+    let prologue = \case
+          Nothing -> liftIO $ hPutStrLn stderr $ "==================== " <> phaseName (phase s) <> " ===================="
+          Just i -> liftIO $ hPutStrLn stderr $ "==================== " <> phaseName (phase s) <> " #" <> show i <> " ===================="
     case s of
-      SParsed -> pSimple x
-      STyped -> pSimple x
-      SKNormal -> pCustom x
-      STupleFlatten {} -> pCustom x
-      SBeta {} -> pCustom x
-      SAssoc {} -> pCustom x
-      SClosure -> pSimple x
-      SVirtual -> pSimple x
-      SRegAlloc -> pSimple x
+      SParsed -> prologue Nothing *> pSimple x
+      STyped -> prologue Nothing *> pSimple x
+      SKNormal -> prologue Nothing *> pCustom x
+      STupleFlatten i -> prologue (Just i) *> pCustom x
+      SBeta i -> prologue (Just i) *> pCustom x
+      SAssoc i -> prologue (Just i) *> pCustom x
+      SClosure -> prologue Nothing *> pSimple x
+      SVirtual -> prologue Nothing *> pSimple x
+      SRegAlloc -> prologue Nothing *> pSimple x
   where
     pSimple :: (MonadIO m, Show a) => a -> m ()
     pSimple = P.pHPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True} stderr
