@@ -1,4 +1,4 @@
-module Middleend.KNormal (Exp (..), Binder (..), FunBind (..), kNormal) where
+module Middleend.KNormal (Exp (..), Binder (..), FunBind (..), kNormal, freeVars) where
 
 import Basic (Binder (..), Cmp (..), FunBind (..), PrimOp (..), Rel (..))
 import Control.Comonad (extract)
@@ -8,6 +8,7 @@ import Control.Monad.Trans.Cont (ContT (..), evalContT)
 import Data.Bitraversable (Bitraversable (bitraverse))
 import Data.Bool (bool)
 import Data.Map.Strict qualified as M
+import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Frontend.Syntax qualified as S
@@ -49,6 +50,17 @@ instance Pretty Exp where
       nest 2 ("let rec" <+> pretty binder.name <+> hsep (parens . pretty <$> params) <+> "=" <> line <> pretty rhs) <> hardline <> "in" <> hardline <> pretty body
     LetTuple binders rhs body -> "let" <+> tupled (pretty <$> binders) <+> "=" <+> pretty rhs <+> "in" <> hardline <> pretty body
     App fun args -> hsep (pretty fun : (pretty <$> args))
+
+freeVars :: Exp -> S.Set Id
+freeVars = \case
+  (Unit; Int {}; Float {}) -> S.empty
+  Var ident -> S.singleton ident
+  PrimOp op -> foldMap S.singleton op
+  If _ lhs rhs thn els -> S.fromList [lhs, rhs] <> freeVars thn <> freeVars els
+  Let binder rhs body -> (freeVars rhs) <> (S.delete binder.name (freeVars body))
+  LetRec FunBind {binder, params, rhs} body -> (S.difference (S.fromList $ (.name) <$> binder : params) (freeVars rhs)) <> (S.delete binder.name (freeVars body))
+  LetTuple binders rhs body -> (S.singleton rhs) <> (S.difference (freeVars body) (S.fromList $ (.name) <$> binders))
+  App fun args -> S.fromList $ fun : args
 
 insertLet :: (Fresh :> es) => Type -> Eff es Exp -> (Id -> Eff es Exp) -> Eff es Exp
 insertLet ty scrutM k = do

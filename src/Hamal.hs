@@ -22,6 +22,7 @@ import Middleend.KNormal (kNormal)
 import Middleend.KNormal qualified as K
 import Middleend.Opt.Assoc (assocLet)
 import Middleend.Opt.Beta (betaConvert)
+import Middleend.Opt.Elim (elimDeadCode)
 import Middleend.Opt.TupleFlatten (flattenArgs, flattenLetTuple)
 import Name (Fresh, Id, runFresh)
 
@@ -32,6 +33,7 @@ data Phase
   | TupleFlatten
   | Beta
   | Assoc
+  | Elim
   | Closure
   | Virtual
   | RegAlloc
@@ -44,6 +46,7 @@ data Stage a where
   STupleFlatten :: Int -> Stage K.Exp
   SBeta :: Int -> Stage K.Exp
   SAssoc :: Int -> Stage K.Exp
+  SElim :: Int -> Stage K.Exp
   SClosure :: Stage C.Program
   SVirtual :: Stage (V.Program Id Id)
   SRegAlloc :: Stage (V.Program XReg FReg)
@@ -56,6 +59,7 @@ phase = \case
   STupleFlatten {} -> TupleFlatten
   SBeta {} -> Beta
   SAssoc {} -> Assoc
+  SElim {} -> Elim
   SClosure -> Closure
   SVirtual -> Virtual
   SRegAlloc -> RegAlloc
@@ -68,6 +72,7 @@ phaseName = \case
   TupleFlatten -> "flatten"
   Beta -> "beta"
   Assoc -> "assoc"
+  Elim -> "elim"
   Closure -> "closure"
   Virtual -> "virtual"
   RegAlloc -> "regalloc"
@@ -106,4 +111,4 @@ optimize limit = go 1
           logMsg $ "iteration #" <> show iter
           next <- foldM (\e (stg, pass) -> stage (stg iter) $ pass e) knorm passes
           if knorm == next then pure next else go (iter + 1) next
-    passes = [(STupleFlatten, fmap flattenLetTuple . flattenArgs), (SBeta, betaConvert), (SAssoc, pure . assocLet)]
+    passes = [(STupleFlatten, fmap flattenLetTuple . flattenArgs), (SBeta, betaConvert), (SAssoc, pure . assocLet), (SElim, elimDeadCode)]
