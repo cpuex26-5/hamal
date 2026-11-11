@@ -21,8 +21,8 @@ isPure = \case
   App {} -> False
   where
     isPureOp = \case
-      (Not {}; Neg {}; FNeg {}; Add {}; Sub {}; Sali {}; Sari {}; FAdd {}; FSub {}; FMul {}; FDiv {}; FSqrt {}; Tuple {}; Array {}; Get {}; FloatOfInt {}; IntOfFloat {}) -> True
-      (Put {}; Out {}) -> False
+      (Not {}; Neg {}; Add {}; Sub {}; Sali {}; Sari {}; FNeg {}; FAbs {}; FAdd {}; FSub {}; FMul {}; FDiv {}; FSqrt {}; Tuple {}; Array {}; Get {}; Floor {}; FloatOfInt {}; IntOfFloat {}) -> True
+      (Put {}; In {}; Out {}) -> False
 
 elimDeadCode :: (Log :> es) => Exp -> Eff es Exp
 elimDeadCode = go

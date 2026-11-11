@@ -137,7 +137,11 @@ infer (sspan :< expr) = case expr of
     inferPrim op = case op of
       B.Not ty -> ty `ascribe` T.Bool $> T.Bool
       B.Neg {}; B.Add {}; B.Sub {}; B.Sali {}; B.Sari {} -> traverse_ (`ascribe` T.Int) op $> T.Int
-      B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {}; B.FSqrt {} -> traverse_ (`ascribe` T.Float) op $> T.Float
+      B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {}; B.FSqrt {}; B.FAbs {}; B.Floor {} -> traverse_ (`ascribe` T.Float) op $> T.Float
+      B.FloatOfInt ty -> ty `ascribe` T.Int $> T.Float
+      B.IntOfFloat ty -> ty `ascribe` T.Float $> T.Int
+      B.In ty -> ty `ascribe` T.Unit $> T.Int
+      B.Out ty -> ty `ascribe` T.Int $> T.Unit
       B.Tuple tys -> pure (T.Tuple . map typeof $ tys)
       B.Array size initial -> do
         size `ascribe` T.Int
@@ -151,9 +155,6 @@ infer (sspan :< expr) = case expr of
         arr `ascribe` T.Array (typeof val)
         idx `ascribe` T.Int
         pure T.Unit
-      B.FloatOfInt ty -> ty `ascribe` T.Int $> T.Float
-      B.IntOfFloat ty -> ty `ascribe` T.Float $> T.Int
-      B.Out ty -> ty `ascribe` T.Int $> T.Unit
     inferApp fun args = do
       fun' <- infer fun
       args' <- mapM infer args
@@ -164,10 +165,14 @@ infer (sspan :< expr) = case expr of
       [ ("not", Not ())
       , ("Array.create", Array () ())
       , ("Array.make", Array () ())
+      , ("sqrt", FSqrt ())
+      , ("fabs", FAbs ())
+      , ("fabs", FAbs ())
+      , ("floor", Floor ())
       , ("float_of_int", FloatOfInt ())
       , ("int_of_float", IntOfFloat ())
-      , ("print_char", Out ())
-      , ("sqrt", FSqrt ())
+      , ("print_byte", Out ())
+      , ("read_byte", In ())
       ]
     fill shape xs = case runStateT (traverse (const (StateT uncons)) shape) xs of
       Just (filled, []) -> Just filled

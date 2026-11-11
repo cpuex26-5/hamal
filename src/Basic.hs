@@ -9,22 +9,25 @@ import Prettyprinter (Pretty (..), tupled, (<+>))
 data PrimOp a
   = Not a
   | Neg a
-  | FNeg a
   | Add a a
   | Sub a a
   | Sali a Int
   | Sari a Int
+  | FNeg a
   | FAdd a a
   | FSub a a
   | FMul a a
   | FDiv a a
   | FSqrt a
+  | FAbs a
+  | Floor a
   | Tuple [a]
   | Array a a
   | Get a a
   | Put a a a
   | FloatOfInt a
   | IntOfFloat a
+  | In a
   | Out a
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 PrimOp
@@ -33,23 +36,26 @@ instance (Pretty a) => Pretty (PrimOp a) where
   pretty = \case
     Not e -> "not" <+> pretty e
     Neg e -> "-" <+> pretty e
-    FNeg e -> "-." <+> pretty e
     Add l r -> pretty l <+> "+" <+> pretty r
     Sub l r -> pretty l <+> "-" <+> pretty r
     Sali e shamt -> pretty e <+> "<<" <+> pretty shamt
     Sari e shamt -> pretty e <+> "/" <+> pretty shamt
+    FNeg e -> "-." <+> pretty e
     FAdd l r -> pretty l <+> "+." <+> pretty r
     FSub l r -> pretty l <+> "-." <+> pretty r
     FMul l r -> pretty l <+> "*." <+> pretty r
     FDiv l r -> pretty l <+> "/." <+> pretty r
     FSqrt e -> "sqrt" <+> pretty e
+    FAbs e -> "fabs" <+> pretty e
+    Floor e -> "floor" <+> pretty e
     Tuple es -> tupled (pretty <$> es)
     Array n x -> "Array.make" <+> pretty n <+> pretty x
     Get arr idx -> pretty arr <> ".(" <> pretty idx <> ")"
     Put arr idx rhs -> pretty arr <> ".(" <> pretty idx <> ")" <+> "<-" <+> pretty rhs
     FloatOfInt e -> "float_of_int" <+> pretty e
     IntOfFloat e -> "int_of_float" <+> pretty e
-    Out e -> "print_char" <+> pretty e
+    In e -> "read_byte" <+> pretty e
+    Out e -> "print_byte" <+> pretty e
 
 data Rel = Eq | Neq | Lt | Le | Gt | Ge
   deriving stock (Show, Eq)
