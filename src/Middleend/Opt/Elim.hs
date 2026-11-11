@@ -1,10 +1,6 @@
 module Middleend.Opt.Elim (elimDeadCode) where
 
-import Basic (
-  Binder (..),
-  FunBind (..),
-  PrimOp (..),
- )
+import Basic (Binder (..), FunBind (..), PrimOp (..))
 import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Log (Log, logMsg)
