@@ -53,7 +53,7 @@ instance Pretty Exp where
     AppCls fun args -> hsep (pretty fun : (pretty <$> args))
 
 data FunDef = FunDef
-  { binder :: Binder Label Type
+  { binder :: Binder Id Type
   , params :: [Binder Id Type]
   , formalFv :: [Binder Id Type]
   , rhs :: Exp
@@ -89,7 +89,7 @@ freeVars = \case
   LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList ((.name) <$> binders)
   LetCls binder Closure {actualFv} body -> S.delete binder.name (S.union (S.fromList ((.name) <$> actualFv)) (freeVars body))
   AppDir _ args -> S.fromList args
-  AppCls _ args -> S.fromList args
+  AppCls cls args -> S.fromList $ cls : args
 
 knownFuns :: K.Exp -> S.Set Id
 knownFuns kexp = S.map (.binder) $ stabilize phi allFunDef
@@ -151,7 +151,7 @@ closureConvert kexp = do
         body' <- local (with binder) (go body)
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : params)
         typedFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable): " <> show name) name env}) <$> fv)
-        output $ FunDef {binder = first Local binder, params, formalFv = typedFv, rhs = rhs'}
+        output $ FunDef {binder, params, formalFv = typedFv, rhs = rhs'}
         if binder.name `S.member` (freeVars body')
           then do
             logMsg $ "making closure: " <> show binder

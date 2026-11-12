@@ -1,4 +1,4 @@
-module Name (Symbol, Id, Label (..), Fresh, fresh, refresh, runFresh, freshI, symbolOf) where
+module Name (Symbol, Id, Label (..), Fresh, fresh, refresh, runFresh, freshI) where
 
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (intDec, shortByteString)
@@ -22,10 +22,6 @@ instance Pretty Id where
 
 data Label = Local Id | Global Symbol
   deriving stock (Show, Eq)
-
-symbolOf :: Label -> ShortByteString
-symbolOf (Local Id {hint}) = hint
-symbolOf (Global sym) = sym
 
 instance Pretty Label where
   pretty = \case
