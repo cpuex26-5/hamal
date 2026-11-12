@@ -34,6 +34,7 @@ data Phase
   | Beta
   | Assoc
   | Elim
+  | Optimized
   | Closure
   | Virtual
   | RegAlloc
@@ -47,6 +48,7 @@ data Stage a where
   SBeta :: Int -> Stage K.Exp
   SAssoc :: Int -> Stage K.Exp
   SElim :: Int -> Stage K.Exp
+  SOptimized :: Stage K.Exp
   SClosure :: Stage C.Program
   SVirtual :: Stage (V.Program Id Id)
   SRegAlloc :: Stage (V.Program XReg FReg)
@@ -60,6 +62,7 @@ phase = \case
   SBeta {} -> Beta
   SAssoc {} -> Assoc
   SElim {} -> Elim
+  SOptimized -> Optimized
   SClosure -> Closure
   SVirtual -> Virtual
   SRegAlloc -> RegAlloc
@@ -73,6 +76,7 @@ phaseName = \case
   Beta -> "beta"
   Assoc -> "assoc"
   Elim -> "elim"
+  Optimized -> "optimized"
   Closure -> "closure"
   Virtual -> "virtual"
   RegAlloc -> "regalloc"
@@ -96,8 +100,8 @@ compile limit input = runFresh do
   syntax <- stage SParsed . either (throwError . ParseError) pure $ runAlex input parse
   typed <- stage STyped . runErrorNoCallStackWith (throwError . TypeError) $ typing syntax
   knorm <- stage SKNormal . kNormal $ typed
-  middle <- optimize limit knorm
-  closure <- stage SClosure . pure . closureConvert $ middle
+  middle <- stage SOptimized $ optimize limit knorm
+  closure <- stage SClosure . closureConvert $ middle
   virtual <- stage SVirtual . virtualify $ closure
   regalloc <- stage SRegAlloc . pure . regAlloc $ virtual
   emit regalloc

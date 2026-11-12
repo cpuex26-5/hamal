@@ -62,6 +62,10 @@ allocInst = \case
     CallDir fun
       <$> traverse (uncurry rx) (assignRegs xargRegs xargs)
       <*> traverse (uncurry rf) (assignRegs fargRegs fargs)
+  CallCls cls xargs fargs ->
+    CallCls cls
+      <$> traverse (uncurry rx) (assignRegs xargRegs xargs)
+      <*> traverse (uncurry rf) (assignRegs fargRegs fargs)
   Save dst (OpX x) -> Save dst . OpX <$> rx T0 x
   Save dst (OpF f) -> Save dst . OpF <$> rf Ft0 f
   Restore ident -> pure $ Restore ident

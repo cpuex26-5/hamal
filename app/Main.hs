@@ -32,6 +32,7 @@ runInspect opts = interpret_ \(Inspect s x) ->
       SBeta i -> prologue (Just i) *> pCustom x
       SAssoc i -> prologue (Just i) *> pCustom x
       SElim i -> prologue (Just i) *> pCustom x
+      SOptimized -> prologue Nothing *> pCustom x
       SClosure -> prologue Nothing *> pSimple x
       SVirtual -> prologue Nothing *> pSimple x
       SRegAlloc -> prologue Nothing *> pSimple x

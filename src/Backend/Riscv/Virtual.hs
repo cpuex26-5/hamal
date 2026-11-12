@@ -1,14 +1,15 @@
 module Backend.Riscv.Virtual (virtualify) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Operand (..), Program (..), SingClass (..), SomeClass (..))
-import Basic (Cmp (..))
+import Basic (Binder (..), Cmp (..))
 import Basic qualified as B
+import Data.Functor (($>))
 import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Effectful.State.Static.Local (State, gets, modify, runState)
 import Middleend.Closure qualified as C
-import Name (Fresh, Id, Label (..), fresh)
+import Name (Fresh, Id, Label (..), fresh, symbolOf)
 import Type qualified as T
 
 type Env = M.Map Id SomeClass
@@ -46,12 +47,27 @@ vBlock c = \case
     pure $ insertLet (operand c' binder.name) rhs' body'
   C.LetTuple binders rhs body -> do
     body' <- local @Env (M.union (M.fromList [(b.name, classOf b.ty) | b <- binders])) (vBlock c body)
-    pure $ foldr load body' (zip binders [0, 4 ..])
+    pure $ foldr (withLoad rhs) body' (zip binders [0, 4 ..])
     where
-      load (binder, offset) b = case classOf binder.ty of
-        SomeClass SGPR -> Let (Just (OpX binder.name)) (Lw offset rhs) b
-        SomeClass SFPR -> Let (Just (OpF binder.name)) (FLw offset rhs) b
-        SomeClass SVoid -> b
+      withLoad :: forall c. Id -> (Binder Id T.Type, Int) -> Block c Id Id -> Block c Id Id
+      withLoad base (Binder {name, ty}, offset) k = case classOf ty of
+        SomeClass SGPR -> Let (operand SGPR name) (Lw offset base) k
+        SomeClass SFPR -> Let (operand SFPR name) (FLw offset base) k
+        SomeClass SVoid -> k
+  C.LetCls binder C.Closure {entry, actualFv} body | SomeClass c' <- classOf binder.ty -> do
+    body' <- local (M.insert binder.name (SomeClass c')) (vBlock c body)
+    closure <- fresh ("cls." <> symbolOf entry)
+    pure
+      $ Let (operand SGPR binder.name) (Alloc (4 * length actualFv + 4))
+      $ Let (operand SGPR closure) (La entry)
+      $ Let Nothing (StoreL (OpX closure) entry 0)
+      $ foldr (withStore closure) body' (zip actualFv [4, 4 ..])
+    where
+      withStore :: forall c. Id -> (Binder Id T.Type, Int) -> Block c Id Id -> Block c Id Id
+      withStore base (Binder {name, ty}, offset) k = case classOf ty of
+        SomeClass SGPR -> Let Nothing (Store (OpX name) base offset) k
+        SomeClass SFPR -> Let Nothing (Store (OpX name) base offset) k
+        SomeClass SVoid -> k
   C.If (ICmp rel) lhs rhs thn els -> Ans <$> (If rel lhs rhs <$> vBlock c thn <*> vBlock c els)
   C.If (FCmp rel) lhs rhs thn els -> Ans <$> (FIf rel lhs rhs <$> vBlock c thn <*> vBlock c els)
   C.PrimOp (B.Tuple binders) | SGPR <- c -> do
@@ -71,14 +87,20 @@ vInst c e = case (c, e) of
     where
       new = do
         label <- Local <$> fresh "Lf"
-        label <$ modify (M.insert float label)
+        modify (M.insert float label)
+          $> label
   (_, C.PrimOp op) -> vPrimOp c op
   (SGPR, C.Var ident) -> pure $ Mv (OpX ident)
   (SFPR, C.Var ident) -> pure $ Mv (OpF ident)
   (SVoid, C.Var _) -> pure Nop
-  (_, C.AppDir label args) ->
-    uncurry (CallDir label) . partitionByClass
-      <$> traverse (\n -> (n,) <$> classOfVar n) args
+  (_, C.AppDir label args) -> do
+    cargs <- traverse (\n -> (n,) <$> classOfVar n) args
+    let (xargs, fargs) = partitionByClass cargs
+    pure $ CallDir label xargs fargs
+  (_, C.AppCls closure args) -> do
+    cargs <- traverse (\n -> (n,) <$> classOfVar n) args
+    let (xargs, fargs) = partitionByClass cargs
+    pure $ CallCls (Local closure) xargs fargs
   _ -> error $ "vInst(unreachable): " <> show (c, e)
   where
     classOfVar = asks . M.findWithDefault (error "unreachable")
@@ -104,20 +126,18 @@ vPrimOp c e = case (c, e) of
 
 vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)
 vFunc C.FunDef {binder, params, formalFv, rhs} = case binder.ty of
-  T.Type (T.Fun _ ret) | SomeClass c <- classOf (T.Type ret) -> do
+  T.Type (T.Fun _ ret) | SomeClass cret <- classOf (T.Type ret) -> do
     let env = M.fromList [(b.name, classOf b.ty) | b <- params <> formalFv]
-    rhs' <- runReader env (vBlock c rhs)
-    let load =
-          foldr
-            ( \(fv, offset) rest -> case classOf fv.ty of
-                SomeClass SGPR -> Let (operand SGPR fv.name) (LwL offset binder.name) rest
-                SomeClass SFPR -> Let (operand SFPR fv.name) (FLwL offset binder.name) rest
-                SomeClass SVoid -> rest
-            )
-            rhs'
-            (zip formalFv [4, 4 ..])
+    rhs' <- runReader env (vBlock cret rhs)
+    let rhsWithLoad = foldr (withLoadL binder.name) rhs' (zip formalFv [4, 4 ..])
     let (xparams, fparams) = partitionByClass [(b.name, classOf b.ty) | b <- params]
-    pure $ FunDef {binder = binder.name, xparams, fparams, rhs = load, ret = c}
+    pure $ FunDef {binder = binder.name, xparams, fparams, rhs = rhsWithLoad, ret = cret}
+    where
+      withLoadL :: forall c. Label -> (Binder Id T.Type, Int) -> Block c Id Id -> Block c Id Id
+      withLoadL baseL (Binder {name, ty}, offset) k = case classOf ty of
+        SomeClass SGPR -> Let (operand SGPR name) (LwL offset baseL) k
+        SomeClass SFPR -> Let (operand SFPR name) (FLwL offset baseL) k
+        SomeClass SVoid -> k
   _ -> error "unreachable"
 
 virtualify :: (Fresh :> es) => C.Program -> Eff es (Program Id Id)

@@ -19,6 +19,10 @@ data Dest c where
   Tail :: SingClass c -> Dest c
   NonTail :: Maybe (Operand c XReg FReg) -> Dest c
 
+regHp, regCl :: XReg
+regHp = Gp
+regCl = Tp
+
 mkFrame :: Block c x f -> Frame
 mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
   where
@@ -118,6 +122,13 @@ emitNonTail rdM = \case
     for_ rdM \case
       OpX x -> emitI "mv" [build x, build A0]
       OpF f -> emitI "fmv.s" [build f, build Fa0]
+  CallCls cls _ _ -> do
+    emitI "lw" [build T0, memFormat 0 regCl]
+    emitI "jalr" [build Ra, memFormat 0 T0]
+    emitI "call" [build cls]
+    for_ rdM \case
+      OpX x -> emitI "mv" [build x, build A0]
+      OpF f -> emitI "fmv.s" [build f, build Fa0]
   FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
   FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
@@ -137,8 +148,8 @@ emitNonTail rdM = \case
     emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
     emitI "sw" [build rs, memFormat 0 T1]
   Alloc size -> do
-    for_ (xreg rdM) \rd -> emitI "mv" [build rd, build Tp]
-    emitI "addi" [build Tp, build Tp, BB.intDec size]
+    for_ (xreg rdM) \rd -> emitI "mv" [build rd, build regHp]
+    emitI "addi" [build regHp, build regHp, BB.intDec size]
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
     xreg = fmap \(OpX r) -> r

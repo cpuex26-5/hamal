@@ -28,7 +28,7 @@ data Exp
   | LetRec (FunBind (Binder Id Type) Exp) Exp
   | LetTuple [Binder Id Type] Id Exp
   | App Id [Id]
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Ord)
 
 instance Pretty Exp where
   pretty = \case

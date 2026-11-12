@@ -1,20 +1,21 @@
 module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
 
 import Basic (Binder (..), Cmp, FunBind (..), PrimOp)
-import Control.Monad (unless)
 import Data.Bifunctor (first)
+import Data.Functor (($>))
 import Data.Map.Strict as M hiding (null)
 import Data.Set qualified as S
-import Effectful (Eff, runPureEff, (:>))
+import Effectful (Eff, (:>))
 import Effectful.Output.Static.Local.List (Output, output, runOutput)
 import Effectful.Reader.Static (Reader, asks, local, runReader)
+import Log (Log, logMsg)
 import Middleend.KNormal qualified as K
 import Name (Id, Label (Local))
 import Type (Type)
 
 data Closure = Closure
   { entry :: Label
-  , actualFv :: [Id]
+  , actualFv :: [Binder Id Type]
   }
   deriving stock (Eq, Show)
 
@@ -27,10 +28,9 @@ data Exp
   | If Cmp Id Id Exp Exp
   | Let (Binder Id Type) Exp Exp
   | LetTuple [Binder Id Type] Id Exp
-  | -- \| MakeCls Id Closure Exp
-    -- \| AppCls Id [Id]
-    AppDir Label [Id]
-  -- \| ExtArray Label
+  | LetCls (Binder Id Type) Closure Exp
+  | AppCls Id [Id]
+  | AppDir Label [Id]
   deriving stock (Eq, Show)
 
 data FunDef = FunDef
@@ -50,14 +50,59 @@ freeVars = \case
   Var ident -> S.singleton ident
   PrimOp op -> foldMap S.singleton op
   If _ lhs rhs thn els -> S.singleton lhs <> S.singleton rhs <> freeVars thn <> freeVars els
-  Let binder rhs body -> S.difference (freeVars rhs <> freeVars body) $ S.singleton binder.name
-  AppDir _ args -> S.fromList args
+  Let binder rhs body -> S.delete binder.name (freeVars rhs <> freeVars body)
   LetTuple binders rhs body -> S.difference (S.singleton rhs <> freeVars body) $ S.fromList ((.name) <$> binders)
+  LetCls binder Closure {actualFv} body -> S.delete binder.name (S.union (S.fromList ((.name) <$> actualFv)) (freeVars body))
+  AppDir _ args -> S.fromList args
+  AppCls _ args -> S.fromList args
 
-closureConvert :: K.Exp -> Program
-closureConvert = uncurry (flip Program) . runPureEff . runOutput . runReader (M.empty :: M.Map Id Type) . go
+knownFuns :: K.Exp -> S.Set Id
+knownFuns kexp = S.map (.binder) $ stabilize phi allFunDef
   where
-    go :: (Output FunDef :> es, Reader (M.Map Id Type) :> es) => K.Exp -> Eff es Exp
+    stabilize f x
+      | f x == x = x
+      | otherwise = stabilize f (f x)
+
+    allFunDef = go kexp
+      where
+        go = \case
+          (K.Unit; K.Int {}; K.Float {}; K.Var {}; K.PrimOp {}; K.App {}) -> S.empty
+          K.If _ _ _ thn els -> S.union (go thn) (go els)
+          K.Let _ _ body -> go body
+          K.LetTuple _ _ body -> go body
+          K.LetRec fundef body -> S.insert (first (.name) fundef) (go body)
+
+    phi known = S.filter (\K.FunBind {params, rhs} -> (fvwrt known rhs) `S.isSubsetOf` (S.fromList params)) known
+    fvwrt known = go
+      where
+        isKnown f = f `S.member` (S.map (.binder) known)
+        go = \case
+          (K.Unit; K.Int {}; K.Float {}) -> S.empty
+          K.Var ident -> S.singleton ident
+          K.PrimOp op -> foldMap S.singleton op
+          K.If _ lhs rhs thn els -> S.fromList [lhs, rhs] <> go thn <> go els
+          K.Let binder rhs body -> (go rhs) <> (S.delete binder.name (go body))
+          K.LetRec FunBind {binder, params, rhs} body ->
+            if binder.name `S.member` fvBody
+              then S.delete binder.name $ S.union actualFv fvBody
+              else
+                fvBody
+            where
+              fvBody = go body
+              actualFv = (go rhs) `S.difference` (S.fromList $ binder.name : ((.name) <$> params))
+          K.LetTuple binders rhs body -> (S.singleton rhs) <> ((go body) `S.difference` (S.fromList $ (.name) <$> binders))
+          K.App fun args | isKnown fun -> S.fromList args
+          K.App fun args -> S.fromList $ fun : args
+
+type Env = M.Map Id Type
+
+closureConvert :: (Log :> es) => K.Exp -> Eff es Program
+closureConvert kexp = do
+  (cexp, fundefs) <- runOutput $ runReader @Env M.empty $ go kexp
+  pure $ Program fundefs cexp
+  where
+    known = knownFuns kexp
+    go :: (Output FunDef :> es, Reader (M.Map Id Type) :> es, Log :> es) => K.Exp -> Eff es Exp
     go = \case
       K.Unit -> pure Unit
       K.Int int -> pure $ Int int
@@ -68,12 +113,17 @@ closureConvert = uncurry (flip Program) . runPureEff . runOutput . runReader (M.
       K.Let binder rhs body -> Let binder <$> go rhs <*> local (with binder) (go body)
       K.LetRec FunBind {binder, params, rhs} body -> do
         rhs' <- local (foldMap with (binder : params)) (go rhs)
-        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : params)
         body' <- local (with binder) (go body)
-        formalFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable)" <> show name) name env}) <$> fv)
-        unless (null formalFv) (error "closure found")
-        output $ FunDef {binder = first Local binder, params, formalFv, rhs = rhs'}
-        pure body'
+        let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : params)
+        typedFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable): " <> show name) name env}) <$> fv)
+        output $ FunDef {binder = first Local binder, params, formalFv = typedFv, rhs = rhs'}
+        if binder.name `S.member` (freeVars body')
+          then do
+            logMsg $ "eliminating closure: " <> show binder
+            pure $ LetCls binder Closure {entry = Local binder.name, actualFv = typedFv} body'
+          else
+            pure body'
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap with binders) (go body)
-      K.App fun args -> pure $ AppDir (Local fun) args
+      K.App fun args | fun `S.member` known -> logMsg ("directly applying: " <> show (K.App fun args)) $> AppDir (Local fun) args
+      K.App fun args -> pure $ AppCls fun args
     with binder = M.insert binder.name binder.ty

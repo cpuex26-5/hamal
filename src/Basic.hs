@@ -29,7 +29,7 @@ data PrimOp a
   | IntOfFloat a
   | In a
   | Out a
-  deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
+  deriving stock (Show, Eq, Ord, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 PrimOp
 
 instance (Pretty a) => Pretty (PrimOp a) where
@@ -58,7 +58,7 @@ instance (Pretty a) => Pretty (PrimOp a) where
     Out e -> "print_byte" <+> pretty e
 
 data Rel = Eq | Neq | Lt | Le | Gt | Ge
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Ord)
 
 instance Pretty Rel where
   pretty Eq = "="
@@ -69,7 +69,7 @@ instance Pretty Rel where
   pretty Ge = ">="
 
 data Cmp = ICmp Rel | FCmp Rel
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Ord)
 
 instance Pretty Cmp where
   pretty = \case
@@ -87,7 +87,7 @@ deriveBifoldable ''Binder
 deriveBitraversable ''Binder
 
 data FunBind b r = FunBind {binder :: b, params :: [b], rhs :: r}
-  deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)
+  deriving stock (Show, Eq, Ord, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 (FunBind b)
 
 deriveBifunctor ''FunBind
