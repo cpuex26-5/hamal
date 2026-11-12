@@ -1,10 +1,12 @@
 module Backend.Riscv.Asm (RegClass (..), SingClass (..), SomeClass (..), Operand (..), Block (..), Inst (..), FunDef (..), Program (..), XReg (..), FReg (..), idOf, dstOf) where
 
-import Basic (Rel)
+import Basic (Cmp (..), Rel)
 import Buildable (Buildable (..))
 import Data.ByteString.Builder (string7)
 import Data.Char (toLower)
 import Name (Id, Label)
+import Pretty qualified as P
+import Prettyprinter (Pretty (..), align, concatWith, hardline, nest, surround, tupled, (<+>))
 
 data RegClass = GPR | FPR | Void
   deriving stock (Show, Eq)
@@ -16,6 +18,12 @@ data SingClass (c :: RegClass) where
 
 deriving stock instance Show (SingClass c)
 
+instance Pretty (SingClass c) where
+  pretty = \case
+    SGPR -> "gpr"
+    SFPR -> "fpr"
+    SVoid -> "void"
+
 data SomeClass where
   SomeClass :: SingClass c -> SomeClass
 
@@ -25,11 +33,21 @@ data Operand (c :: RegClass) x f where
 
 deriving stock instance (Show x, Show f) => Show (Operand c x f)
 
+instance (Pretty x, Pretty f) => Pretty (Operand c x f) where
+  pretty (OpX x) = pretty x
+  pretty (OpF f) = pretty f
+
 data Block (c :: RegClass) x f where
   Ans :: Inst c x f -> Block c x f
   Let :: Maybe (Operand c' x f) -> Inst c' x f -> Block c x f -> Block c x f
 
 deriving stock instance (Show x, Show f) => Show (Block c x f)
+
+instance (Pretty x, Pretty f) => Pretty (Block c x f) where
+  pretty = \case
+    Ans inst -> pretty inst
+    Let Nothing inst body -> pretty inst <> hardline <> pretty body
+    Let (Just dest) inst body -> pretty dest <+> "<-" <+> align (pretty inst) <> hardline <> pretty body
 
 data Inst (c :: RegClass) x f where
   -- Common
@@ -72,6 +90,43 @@ data Inst (c :: RegClass) x f where
 
 deriving stock instance (Show x, Show f) => Show (Inst c x f)
 
+instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
+  pretty = \case
+    Nop -> "nop"
+    Mv rs -> P.insn "mv" [pretty rs]
+    Store rs base offset -> P.insn "store" [pretty rs, P.mem offset base]
+    StoreL rs label offset -> P.insn "storel" [pretty rs, P.mem offset label]
+    CallDir label xargs fargs -> P.call "calldir" (pretty label) xargs fargs
+    CallCls label xargs fargs -> P.call "callcls" (pretty label) xargs fargs
+    Save ident rs -> P.insn "save" [pretty ident, pretty rs]
+    Alloc size -> P.insn "alloc" [pretty size]
+    Out rs -> P.insn "out" [pretty rs]
+    Li imm -> P.insn "li" [pretty imm]
+    La label -> P.insn "la" [pretty label]
+    Neg rs -> P.insn "neg" [pretty rs]
+    Add rs1 rs2 -> P.insn "add" [pretty rs1, pretty rs2]
+    Addi rs imm -> P.insn "addi" [pretty rs, pretty imm]
+    Xori rs imm -> P.insn "xori" [pretty rs, pretty imm]
+    Sub rs1 rs2 -> P.insn "sub" [pretty rs1, pretty rs2]
+    Sali rs imm -> P.insn "sali" [pretty rs, pretty imm]
+    Sari rs imm -> P.insn "sari" [pretty rs, pretty imm]
+    If rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (ICmp rel) <+> pretty rs2) (pretty thn) (pretty els)
+    Lw offset base -> P.insn "lw" [P.mem offset base]
+    LwL offset label -> P.insn "lwl" [P.mem offset label]
+    Restore ident -> P.insn "restore" [pretty ident]
+    FAdd rs1 rs2 -> P.insn "fadd" [pretty rs1, pretty rs2]
+    FNeg rs -> P.insn "fneg" [pretty rs]
+    FSub rs1 rs2 -> P.insn "fsub" [pretty rs1, pretty rs2]
+    FMul rs1 rs2 -> P.insn "fmul" [pretty rs1, pretty rs2]
+    FDiv rs1 rs2 -> P.insn "fdiv" [pretty rs1, pretty rs2]
+    FSqrt rs -> P.insn "fsqrt" [pretty rs]
+    FIf rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (FCmp rel) <+> pretty rs2) (pretty thn) (pretty els)
+    FLw offset base -> P.insn "flw" [P.mem offset base]
+    FLwL offset label -> P.insn "flwl" [P.mem offset label]
+    FRestore ident -> P.insn "frestore" [pretty ident]
+    FloatOfInt rs -> P.insn "float_of_int" [pretty rs]
+    IntOfFloat rs -> P.insn "int_of_float" [pretty rs]
+
 data FunDef x f where
   FunDef ::
     { binder :: Label
@@ -84,8 +139,28 @@ data FunDef x f where
 
 deriving stock instance (Show x, Show f) => Show (FunDef x f)
 
+instance (Pretty x, Pretty f) => Pretty (FunDef x f) where
+  pretty FunDef {binder, xparams, fparams, rhs, ret} =
+    nest 2 $
+      "fundef"
+        <+> pretty binder
+        <+> tupled (pretty <$> xparams)
+        <+> tupled (pretty <$> fparams)
+        <+> "->"
+        <+> pretty ret
+        <+> "="
+        <> hardline
+        <> pretty rhs
+
 data Program x f = Program [(Float, Label)] [FunDef x f] (Block Void x f)
   deriving stock (Show)
+
+instance (Pretty x, Pretty f) => Pretty (Program x f) where
+  pretty (Program floats fundefs main) =
+    P.paragraphs $
+      [concatWith (surround hardline) [pretty label <+> "=" <+> pretty float | (float, label) <- floats] | not (null floats)]
+        <> (pretty <$> fundefs)
+        <> [nest 2 ("main =" <> hardline <> pretty main)]
 
 data XReg
   = Zero
@@ -162,6 +237,12 @@ instance Buildable XReg where
 
 instance Buildable FReg where
   build = string7 . fmap toLower . show
+
+instance Pretty XReg where
+  pretty = pretty . fmap toLower . show
+
+instance Pretty FReg where
+  pretty = pretty . fmap toLower . show
 
 idOf :: Operand c x x -> x
 idOf (OpX i) = i

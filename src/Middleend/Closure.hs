@@ -11,6 +11,8 @@ import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Log (Log, logMsg)
 import Middleend.KNormal qualified as K
 import Name (Id, Label (Local))
+import Pretty qualified as P
+import Prettyprinter (Pretty (..), concatWith, group, hardline, hsep, nest, parens, tupled, vsep, (<+>))
 import Type (Type)
 
 data Closure = Closure
@@ -18,6 +20,9 @@ data Closure = Closure
   , actualFv :: [Binder Id Type]
   }
   deriving stock (Eq, Show)
+
+instance Pretty Closure where
+  pretty Closure {entry, actualFv} = "closure" <+> pretty entry <+> P.braced (pretty . (.name) <$> actualFv)
 
 data Exp
   = Unit
@@ -29,9 +34,23 @@ data Exp
   | Let (Binder Id Type) Exp Exp
   | LetTuple [Binder Id Type] Id Exp
   | LetCls (Binder Id Type) Closure Exp
-  | AppCls Id [Id]
   | AppDir Label [Id]
+  | AppCls Id [Id]
   deriving stock (Eq, Show)
+
+instance Pretty Exp where
+  pretty = \case
+    Unit -> "()"
+    Int int -> pretty int
+    Float float -> pretty float
+    Var ident -> pretty ident
+    PrimOp op -> pretty op
+    If cmp lhs rhs thn els -> P.ifThenElse (pretty lhs <+> pretty cmp <+> pretty rhs) (pretty thn) (pretty els)
+    Let binder rhs body -> P.letIn (pretty binder) (pretty rhs) (pretty body)
+    LetTuple binders rhs body -> P.letIn (tupled (pretty <$> binders)) (pretty rhs) (pretty body)
+    LetCls binder closure body -> P.letIn (pretty binder) (pretty closure) (pretty body)
+    AppDir fun args -> hsep (pretty fun : (pretty <$> args))
+    AppCls fun args -> hsep (pretty fun : (pretty <$> args))
 
 data FunDef = FunDef
   { binder :: Binder Label Type
@@ -41,8 +60,24 @@ data FunDef = FunDef
   }
   deriving stock (Eq, Show)
 
+instance Pretty FunDef where
+  pretty FunDef {binder, params, formalFv, rhs} = nest 2 (header <> hardline <> pretty rhs)
+    where
+      header =
+        group . nest 2 $
+          vsep
+            [ "fundef" <+> pretty binder.name
+            , P.braced (pretty <$> formalFv)
+            , hsep (parens . pretty <$> params) <+> "="
+            ]
+
 data Program = Program [FunDef] Exp
   deriving stock (Eq, Show)
+
+instance Pretty Program where
+  pretty (Program fundefs main) =
+    concatWith (\a b -> a <> hardline <> hardline <> b) $
+      (pretty <$> fundefs) <> [nest 2 ("main =" <> hardline <> pretty main)]
 
 freeVars :: Exp -> S.Set Id
 freeVars = \case

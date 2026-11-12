@@ -13,7 +13,8 @@ import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
 import Frontend.Syntax qualified as S
 import Name (Fresh, Id, Symbol, fresh)
-import Prettyprinter (Pretty (..), group, hardline, hsep, line, nest, parens, tupled, (<+>))
+import Pretty qualified as P
+import Prettyprinter (Pretty (..), hardline, hsep, line, nest, parens, tupled, (<+>))
 import Type (Type)
 import Type qualified as T
 
@@ -37,18 +38,11 @@ instance Pretty Exp where
     Float float -> pretty float
     Var ident -> pretty ident
     PrimOp op -> pretty op
-    If cmp lhs rhs thn els ->
-      group $
-        nest 2 ("if" <+> pretty lhs <+> pretty cmp <+> pretty rhs <+> "then" <+> line <> pretty thn)
-          <> line
-          <> nest 2 ("else" <> line <> pretty els)
-    Let binder rhs body ->
-      group (nest 2 ("let" <+> pretty binder <+> "=" <> line <> pretty rhs) <> line <> "in")
-        <> hardline
-        <> pretty body
+    If cmp lhs rhs thn els -> P.ifThenElse (pretty lhs <+> pretty cmp <+> pretty rhs) (pretty thn) (pretty els)
+    Let binder rhs body -> P.letIn (pretty binder) (pretty rhs) (pretty body)
     LetRec FunBind {binder, params, rhs} body ->
       nest 2 ("let rec" <+> pretty binder.name <+> hsep (parens . pretty <$> params) <+> "=" <> line <> pretty rhs) <> hardline <> "in" <> hardline <> pretty body
-    LetTuple binders rhs body -> "let" <+> tupled (pretty <$> binders) <+> "=" <+> pretty rhs <+> "in" <> hardline <> pretty body
+    LetTuple binders rhs body -> P.letIn (tupled (pretty <$> binders)) (pretty rhs) (pretty body)
     App fun args -> hsep (pretty fun : (pretty <$> args))
 
 freeVars :: Exp -> S.Set Id

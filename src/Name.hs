@@ -29,8 +29,8 @@ symbolOf (Global sym) = sym
 
 instance Pretty Label where
   pretty = \case
-    Local ident -> pretty ident
-    Global sym -> pretty (BS8.unpack (SBS.fromShort sym))
+    Local ident -> "@" <> pretty ident
+    Global sym -> "@" <> pretty (BS8.unpack (SBS.fromShort sym))
 
 instance Buildable Label where
   build = \case

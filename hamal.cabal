@@ -70,6 +70,7 @@ library
     Middleend.Opt.Elim
     Middleend.Opt.TupleFlatten
     Name
+    Pretty
     Type
 
   build-tool-depends:

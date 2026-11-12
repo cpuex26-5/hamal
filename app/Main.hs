@@ -33,9 +33,9 @@ runInspect opts = interpret_ \(Inspect s x) ->
       SAssoc i -> prologue (Just i) *> pCustom x
       SElim i -> prologue (Just i) *> pCustom x
       SOptimized -> prologue Nothing *> pCustom x
-      SClosure -> prologue Nothing *> pSimple x
-      SVirtual -> prologue Nothing *> pSimple x
-      SRegAlloc -> prologue Nothing *> pSimple x
+      SClosure -> prologue Nothing *> pCustom x
+      SVirtual -> prologue Nothing *> pCustom x
+      SRegAlloc -> prologue Nothing *> pCustom x
   where
     pSimple :: (MonadIO m, Show a) => a -> m ()
     pSimple = P.pHPrintOpt P.NoCheckColorTty P.defaultOutputOptionsDarkBg {P.outputOptionsCompact = True} stderr
