@@ -154,9 +154,10 @@ closureConvert kexp = do
         output $ FunDef {binder = first Local binder, params, formalFv = typedFv, rhs = rhs'}
         if binder.name `S.member` (freeVars body')
           then do
-            logMsg $ "eliminating closure: " <> show binder
+            logMsg $ "making closure: " <> show binder
             pure $ LetCls binder Closure {entry = Local binder.name, actualFv = typedFv} body'
-          else
+          else do
+            logMsg $ "eliminating closure: " <> show binder
             pure body'
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap with binders) (go body)
       K.App fun args | fun `S.member` known -> logMsg ("directly applying: " <> show (K.App fun args)) $> AppDir (Local fun) args
