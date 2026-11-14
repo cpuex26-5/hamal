@@ -48,8 +48,8 @@ allocInst = \case
   Addi lhs imm -> Addi <$> rx T0 lhs <*> pure imm
   Xori lhs imm -> Xori <$> rx T0 lhs <*> pure imm
   Sub lhs rhs -> Sub <$> rx T0 lhs <*> rx T1 rhs
-  Sali x shamt -> Sali <$> rx T0 x <*> pure shamt
-  Sari x shamt -> Sari <$> rx T0 x <*> pure shamt
+  Slli x shamt -> Slli <$> rx T0 x <*> pure shamt
+  Srai x shamt -> Srai <$> rx T0 x <*> pure shamt
   Lw offset addr -> Lw offset <$> rx T0 addr
   LwL offset label -> pure (LwL offset label)
   Store (OpX x) addr offset -> Store . OpX <$> rx T0 x <*> rx T1 addr <*> pure offset
@@ -83,6 +83,8 @@ allocInst = \case
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f
   Out x -> Out <$> rx T0 x
   Alloc size -> pure (Alloc size)
+  MakeArray size (OpX x) -> MakeArray <$> rx T0 size <*> (OpX <$> rx T1 x)
+  MakeArray size (OpF f) -> MakeArray <$> rx T0 size <*> (OpF <$> rf Ft0 f)
   where
     rx x ident = ([Restoring (OpX x) ident], x)
     rf f ident = ([Restoring (OpF f) ident], f)

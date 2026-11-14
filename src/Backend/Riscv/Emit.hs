@@ -59,8 +59,8 @@ emitNonTail rdM = \case
   Addi rs1 imm -> for_ (xreg rdM) \rd -> emitI "addi" [build rd, build rs1, BB.intDec imm]
   Xori rs1 imm -> for_ (xreg rdM) \rd -> emitI "xori" [build rd, build rs1, BB.intDec imm]
   Sub rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build rs1, build rs2]
-  Sali rs imm -> for_ (xreg rdM) \rd -> emitI "sali" [build rd, build rs, BB.intDec imm]
-  Sari rs imm -> for_ (xreg rdM) \rd -> emitI "sari" [build rd, build rs, BB.intDec imm]
+  Slli rs imm -> for_ (xreg rdM) \rd -> emitI "slli" [build rd, build rs, BB.intDec imm]
+  Srai rs imm -> for_ (xreg rdM) \rd -> emitI "srai" [build rd, build rs, BB.intDec imm]
   Lw offset rs -> for_ (xreg rdM) \rd -> emitI "lw" [build rd, memFormat offset rs]
   LwL offset label -> for_ (xreg rdM) \rd -> do
     emitI "la" [build T1, build label]
@@ -147,6 +147,18 @@ emitNonTail rdM = \case
   Alloc size -> do
     for_ (xreg rdM) \rd -> emitI "mv" [build rd, build regHp]
     emitI "addi" [build regHp, build regHp, BB.intDec size]
+  MakeArray size initial -> for_ (xreg rdM) \rd -> do
+    emitI "mv" [build rd, build regHp]
+    emitI "mv" [build T3, build regHp]
+    emitI "slli" [build size, build size, BB.intDec 2]
+    emitI "add" [build regHp, build regHp, build size]
+    loop <- Local <$> fresh "loop"
+    emitL loop
+    case initial of
+      OpX x -> emitI "sw" [build x, memFormat 0 T3]
+      OpF f -> emitI "fsw" [build f, memFormat 0 T3]
+    emitI "addi" [build T3, build T3, BB.intDec 4]
+    emitI "ble" [build T3, build regHp, build loop]
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
     xreg = fmap \(OpX r) -> r

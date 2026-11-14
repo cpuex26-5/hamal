@@ -3,7 +3,7 @@ module Backend.Riscv.Virtual (virtualify) where
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Operand (..), Program (..), SingClass (..), SomeClass (..))
 import Basic (Binder (..), Cmp (..))
 import Basic qualified as B
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
@@ -40,6 +40,9 @@ insertLet :: Maybe (Operand c' x f) -> Block c' x f -> Block c x f -> Block c x 
 insertLet dst (Ans inst) k = Let dst inst k
 insertLet dst (Let d i rest) k = Let d i (insertLet dst rest k)
 
+classOfVar :: (Reader Env :> es) => Id -> Eff es SomeClass
+classOfVar = asks . M.findWithDefault (error "unreachable")
+
 vBlock :: (Fresh :> es, Reader Env :> es, State Fnv :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
 vBlock c = \case
   C.Unit | SVoid <- c -> pure $ Ans Nop
@@ -59,6 +62,28 @@ vBlock c = \case
     pure
       $ Let (Just (OpX tuple)) (Alloc (4 * length binders))
       $ foldr store (Ans (Mv (OpX tuple))) (zip3 binders classes [0, 4 ..])
+  C.PrimOp (B.Get _ _) | SVoid <- c -> pure $ Ans Nop
+  C.PrimOp (B.Get arr idx) | SGPR <- c -> do
+    addr <- fresh "addr"
+    pure
+      $ Let (Just (OpX addr)) (Slli idx 2)
+      $ Let (Just (OpX addr)) (Add addr arr)
+      $ Ans (Lw 0 addr)
+  C.PrimOp (B.Get arr idx) | SFPR <- c -> do
+    addr <- fresh "addr"
+    pure
+      $ Let (Just (OpX addr)) (Slli idx 2)
+      $ Let (Just (OpX addr)) (Add addr arr)
+      $ Ans (FLw 0 addr)
+  C.PrimOp (B.Put arr idx rhs) | SVoid <- c -> do
+    addr <- fresh "addr"
+    SomeClass crhs <- classOfVar rhs
+    pure $ case operand crhs rhs of
+      Just op ->
+        Let (Just (OpX addr)) (Slli idx 2)
+          $ Let (Just (OpX addr)) (Add addr arr)
+          $ Ans (Store op addr 0)
+      Nothing -> Ans Nop
   C.PrimOp op -> Ans <$> vPrimOp c op
   C.Let binder rhs body | SomeClass c' <- classOf binder.ty -> do
     rhs' <- vBlock c' rhs
@@ -102,17 +127,16 @@ vBlock c = \case
       $ Ans (CallInd code (xargs <> [closure]) fargs)
   e -> error $ "vInst(unreachable): " <> show (c, e)
   where
-    classOfVar = asks . M.findWithDefault (error "unreachable")
 
-vPrimOp :: SingClass c -> B.PrimOp Id -> Eff es (Inst c Id Id)
+vPrimOp :: (Reader Env :> es) => SingClass c -> B.PrimOp Id -> Eff es (Inst c Id Id)
 vPrimOp c e = case (c, e) of
   (SGPR, B.Not ident) -> pure $ Xori ident 1
   (SGPR, B.Neg ident) -> pure $ Neg ident
   (SFPR, B.FNeg ident) -> pure $ FNeg ident
   (SGPR, B.Add lhs rhs) -> pure $ Add lhs rhs
   (SGPR, B.Sub lhs rhs) -> pure $ Sub lhs rhs
-  (SGPR, B.Sali ident shamt) -> pure $ Sali ident shamt
-  (SGPR, B.Sari ident shamt) -> pure $ Sari ident shamt
+  (SGPR, B.Slli ident shamt) -> pure $ Slli ident shamt
+  (SGPR, B.Srai ident shamt) -> pure $ Srai ident shamt
   (SFPR, B.FAdd lhs rhs) -> pure $ FAdd lhs rhs
   (SFPR, B.FSub lhs rhs) -> pure $ FSub lhs rhs
   (SFPR, B.FMul lhs rhs) -> pure $ FMul lhs rhs
@@ -121,6 +145,11 @@ vPrimOp c e = case (c, e) of
   (SFPR, B.FloatOfInt int) -> pure $ FloatOfInt int
   (SGPR, B.IntOfFloat float) -> pure $ IntOfFloat float
   (SVoid, B.Out ident) -> pure $ Out ident
+  (SGPR, B.Array size initial) ->
+    classOfVar initial <&> \case
+      SomeClass SGPR -> MakeArray size (OpX initial)
+      SomeClass SFPR -> MakeArray size (OpF initial)
+      SomeClass SVoid -> Alloc 0
   _ -> error $ "virtualOp(unreachable): " <> show (c, e)
 
 vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)

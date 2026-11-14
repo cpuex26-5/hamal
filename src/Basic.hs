@@ -11,8 +11,8 @@ data PrimOp a
   | Neg a
   | Add a a
   | Sub a a
-  | Sali a Int
-  | Sari a Int
+  | Slli a Int
+  | Srai a Int
   | FNeg a
   | FAdd a a
   | FSub a a
@@ -38,8 +38,8 @@ instance (Pretty a) => Pretty (PrimOp a) where
     Neg e -> "-" <+> pretty e
     Add l r -> pretty l <+> "+" <+> pretty r
     Sub l r -> pretty l <+> "-" <+> pretty r
-    Sali e shamt -> pretty e <+> "<<" <+> pretty shamt
-    Sari e shamt -> pretty e <+> "/" <+> pretty shamt
+    Slli e shamt -> pretty e <+> "<<" <+> pretty shamt
+    Srai e shamt -> pretty e <+> "/" <+> pretty shamt
     FNeg e -> "-." <+> pretty e
     FAdd l r -> pretty l <+> "+." <+> pretty r
     FSub l r -> pretty l <+> "-." <+> pretty r

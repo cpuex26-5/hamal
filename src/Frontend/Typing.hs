@@ -136,7 +136,7 @@ infer (sspan :< expr) = case expr of
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
       B.Not ty -> ty `ascribe` T.Bool $> T.Bool
-      B.Neg {}; B.Add {}; B.Sub {}; B.Sali {}; B.Sari {} -> traverse_ (`ascribe` T.Int) op $> T.Int
+      B.Neg {}; B.Add {}; B.Sub {}; B.Slli {}; B.Srai {} -> traverse_ (`ascribe` T.Int) op $> T.Int
       B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {}; B.FSqrt {}; B.FAbs {}; B.Floor {} -> traverse_ (`ascribe` T.Float) op $> T.Float
       B.FloatOfInt ty -> ty `ascribe` T.Int $> T.Float
       B.IntOfFloat ty -> ty `ascribe` T.Float $> T.Int

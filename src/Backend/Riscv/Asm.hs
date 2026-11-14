@@ -59,6 +59,7 @@ data Inst (c :: RegClass) x f where
   CallInd :: x -> [x] -> [f] -> Inst c x f
   Save :: Id -> Operand c x f -> Inst Void x f
   Alloc :: Int -> Inst GPR x f -- dst <- hp; hp <- hp + n
+  MakeArray :: x -> Operand c x f -> Inst GPR x f
   Out :: x -> Inst Void x f
   -- GPR
   Li :: Int -> Inst GPR x f
@@ -68,8 +69,8 @@ data Inst (c :: RegClass) x f where
   Addi :: x -> Int -> Inst GPR x f
   Xori :: x -> Int -> Inst GPR x f
   Sub :: x -> x -> Inst GPR x f
-  Sali :: x -> Int -> Inst GPR x f
-  Sari :: x -> Int -> Inst GPR x f
+  Slli :: x -> Int -> Inst GPR x f
+  Srai :: x -> Int -> Inst GPR x f
   If :: Rel -> x -> x -> Block c x f -> Block c x f -> Inst c x f
   Lw :: Int -> x -> Inst GPR x f
   LwL :: Int -> Label -> Inst GPR x f
@@ -100,6 +101,7 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     CallInd code xargs fargs -> P.call "callind" (pretty code) xargs fargs
     Save ident rs -> P.insn "save" [pretty ident, pretty rs]
     Alloc size -> P.insn "alloc" [pretty size]
+    MakeArray size initial -> P.insn "makearray" [pretty size, pretty initial]
     Out rs -> P.insn "out" [pretty rs]
     Li imm -> P.insn "li" [pretty imm]
     La label -> P.insn "la" [pretty label]
@@ -108,8 +110,8 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Addi rs imm -> P.insn "addi" [pretty rs, pretty imm]
     Xori rs imm -> P.insn "xori" [pretty rs, pretty imm]
     Sub rs1 rs2 -> P.insn "sub" [pretty rs1, pretty rs2]
-    Sali rs imm -> P.insn "sali" [pretty rs, pretty imm]
-    Sari rs imm -> P.insn "sari" [pretty rs, pretty imm]
+    Slli rs imm -> P.insn "slli" [pretty rs, pretty imm]
+    Srai rs imm -> P.insn "srai" [pretty rs, pretty imm]
     If rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (ICmp rel) <+> pretty rs2) (pretty thn) (pretty els)
     Lw offset base -> P.insn "lw" [P.mem offset base]
     LwL offset label -> P.insn "lwl" [P.mem offset label]

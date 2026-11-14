@@ -149,10 +149,10 @@ binder name = Binder { name, ty = () }
 
 pseudoMul, pseudoDiv :: Parsed -> Int -> PrimOp Parsed
 pseudoMul e n
-  | n > 0 && n .&. (n - 1) == 0 = Sali e (countTrailingZeros n)
+  | n > 0 && n .&. (n - 1) == 0 = Slli e (countTrailingZeros n)
   | otherwise = error "Parse error: the right hand side of '*' must be a literal which is some power of two."
 pseudoDiv e n
-  | n > 0 && n .&. (n - 1) == 0 = Sari e (countTrailingZeros n)
+  | n > 0 && n .&. (n - 1) == 0 = Srai e (countTrailingZeros n)
   | otherwise = error "Parse error: the right hand side of '/' must be a literal which is some power of two."
 
 parseError :: Located Token -> Alex a
