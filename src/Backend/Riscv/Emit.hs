@@ -143,7 +143,7 @@ emitNonTail rdM = \case
     emitI "fcvt.s.w" [build rd, build T3]
     emitI "fle.s" [build T4, build rd, build rs]
     emitI "bnez" [build T4, build label]
-    emitI "addi" [build T3, build T3, BB.intDec 1]
+    emitI "addi" [build T3, build T3, BB.intDec (-1)]
     emitI "fcvt.s.w" [build rd, build T3]
     emitL label
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
