@@ -60,6 +60,7 @@ emitNonTail rdM = \case
   Neg rs -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build Zero, build rs]
   Add rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "add" [build rd, build rs1, build rs2]
   Addi rs1 imm -> for_ (xreg rdM) \rd -> emitI "addi" [build rd, build rs1, BB.intDec imm]
+  Xor rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "xor" [build rd, build rs1, build rs2]
   Xori rs1 imm -> for_ (xreg rdM) \rd -> emitI "xori" [build rd, build rs1, BB.intDec imm]
   Sub rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build rs1, build rs2]
   Slli rs imm -> for_ (xreg rdM) \rd -> emitI "slli" [build rd, build rs, BB.intDec imm]

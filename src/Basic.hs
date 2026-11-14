@@ -8,6 +8,7 @@ import Prettyprinter (Pretty (..), tupled, (<+>))
 
 data PrimOp a
   = Not a
+  | Xor a a
   | Neg a
   | Add a a
   | Sub a a
@@ -36,6 +37,7 @@ data PrimOp a
 instance (Pretty a) => Pretty (PrimOp a) where
   pretty = \case
     Not e -> "not" <+> pretty e
+    Xor l r -> "xor" <+> pretty l <+> pretty r
     Neg e -> "-" <+> pretty e
     Add l r -> pretty l <+> "+" <+> pretty r
     Sub l r -> pretty l <+> "-" <+> pretty r

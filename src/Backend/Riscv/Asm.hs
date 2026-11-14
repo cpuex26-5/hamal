@@ -68,6 +68,7 @@ data Inst (c :: RegClass) x f where
   Neg :: x -> Inst GPR x f
   Add :: x -> x -> Inst GPR x f
   Addi :: x -> Int -> Inst GPR x f
+  Xor :: x -> x -> Inst GPR x f
   Xori :: x -> Int -> Inst GPR x f
   Sub :: x -> x -> Inst GPR x f
   Slli :: x -> Int -> Inst GPR x f
@@ -114,6 +115,7 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Neg rs -> P.insn "neg" [pretty rs]
     Add rs1 rs2 -> P.insn "add" [pretty rs1, pretty rs2]
     Addi rs imm -> P.insn "addi" [pretty rs, pretty imm]
+    Xor rs1 rs2 -> P.insn "xor" [pretty rs1, pretty rs2]
     Xori rs imm -> P.insn "xori" [pretty rs, pretty imm]
     Sub rs1 rs2 -> P.insn "sub" [pretty rs1, pretty rs2]
     Slli rs imm -> P.insn "slli" [pretty rs, pretty imm]

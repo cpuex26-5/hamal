@@ -131,6 +131,7 @@ vBlock c = \case
 vPrimOp :: (Reader Env :> es) => SingClass c -> B.PrimOp Id -> Eff es (Inst c Id Id)
 vPrimOp c op = case (c, op) of
   (SGPR, B.Not ident) -> pure $ Xori ident 1
+  (SGPR, B.Xor lhs rhs) -> pure $ Xor lhs rhs
   (SGPR, B.Neg ident) -> pure $ Neg ident
   (SFPR, B.FNeg ident) -> pure $ FNeg ident
   (SGPR, B.Add lhs rhs) -> pure $ Add lhs rhs

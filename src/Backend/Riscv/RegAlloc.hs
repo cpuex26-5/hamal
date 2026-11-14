@@ -46,6 +46,7 @@ allocInst = \case
   Neg x -> Neg <$> rx T0 x
   Add lhs rhs -> Add <$> rx T0 lhs <*> rx T1 rhs
   Addi lhs imm -> Addi <$> rx T0 lhs <*> pure imm
+  Xor lhs rhs -> Xor <$> rx T0 lhs <*> rx T1 rhs
   Xori lhs imm -> Xori <$> rx T0 lhs <*> pure imm
   Sub lhs rhs -> Sub <$> rx T0 lhs <*> rx T1 rhs
   Slli x shamt -> Slli <$> rx T0 x <*> pure shamt

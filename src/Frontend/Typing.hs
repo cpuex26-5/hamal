@@ -135,7 +135,7 @@ infer (sspan :< expr) = case expr of
     with binders = local (M.union $ M.fromList [(name, ty) | Binder {name, ty} <- binders])
     annotate = traverse (\() -> freshTy)
     inferPrim op = case op of
-      B.Not ty -> ty `ascribe` T.Bool $> T.Bool
+      B.Not {}; B.Xor {} -> traverse_ (`ascribe` T.Bool) op $> T.Bool
       B.Neg {}; B.Add {}; B.Sub {}; B.Slli {}; B.Srai {} -> traverse_ (`ascribe` T.Int) op $> T.Int
       B.FNeg {}; B.FAdd {}; B.FSub {}; B.FMul {}; B.FDiv {}; B.FSqrt {}; B.FAbs {}; B.Floor {} -> traverse_ (`ascribe` T.Float) op $> T.Float
       B.FloatOfInt ty -> ty `ascribe` T.Int $> T.Float
@@ -164,6 +164,7 @@ infer (sspan :< expr) = case expr of
       pure $ (sspan, ty) :< S.App fun' args'
     builtins =
       [ ("not", Not ())
+      , ("xor", Xor () ())
       , ("Array.create", Array () ())
       , ("Array.make", Array () ())
       , ("sqrt", FSqrt ())
