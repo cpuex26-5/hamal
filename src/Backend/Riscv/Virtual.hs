@@ -105,7 +105,7 @@ vBlock c = \case
       $ Let (operand SGPR binder.name) (Alloc (4 * length actualFv + 4))
       $ Let (operand SGPR closure) (La entry)
       $ Let Nothing (Store (OpX closure) binder.name 0)
-      $ foldr (withStore binder.name) body' (zip actualFv [4, 4 ..])
+      $ foldr (withStore binder.name) body' (zip actualFv [4, 8 ..])
     where
       withStore :: forall c. Id -> (Binder Id T.Type, Int) -> Block c Id Id -> Block c Id Id
       withStore base (Binder {name, ty}, offset) k = case classOf ty of
@@ -178,7 +178,7 @@ vFunc C.FunDef {binder, params, captured, rhs} = case binder.ty of
         let env = M.fromList [(b.name, classOf b.ty) | b <- params <> formalFv]
         rhs' <- runReader env (vBlock cret rhs)
         let (xparams, fparams) = partitionByClass [(b.name, classOf b.ty) | b <- params]
-        let rhsWithLoad = foldr (withLoad binder.name) rhs' (zip formalFv [4, 4 ..])
+        let rhsWithLoad = foldr (withLoad binder.name) rhs' (zip formalFv [4, 8 ..])
         pure $ FunDef {binder = Local binder.name, xparams = xparams <> [self], fparams, rhs = rhsWithLoad, ret = cret}
     where
       withLoad :: forall c. Id -> (Binder Id T.Type, Int) -> Block c Id Id -> Block c Id Id

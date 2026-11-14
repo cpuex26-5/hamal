@@ -9,12 +9,15 @@ import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
 import Data.List (intersperse)
 import Data.Map.Strict qualified as M
+import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
+import Log (Log, logMsg)
 import Name (Fresh, Id, Label (..), fresh)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
+  deriving stock (Show)
 
 data Dest c where
   Tail :: Bool -> SingClass c -> Dest c
@@ -26,17 +29,17 @@ regHp = Gp
 mkFrame :: Block c x f -> Frame
 mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
   where
-    slots = M.fromList $ zip (saveB block) [0, 4 ..]
+    slots = M.fromList $ zip (S.toList (saveB block)) [0, 4 ..]
     align n = ((n + 15) `div` 16) * 16
     saveB = \case
       Ans inst -> saveI inst
       Let _ rhs body -> saveI rhs <> saveB body
-    saveI :: Inst c x f -> [Id]
+    saveI :: Inst c x f -> S.Set Id
     saveI = \case
       If _ _ _ thn els -> saveB thn <> saveB els
       FIf _ _ _ thn els -> saveB thn <> saveB els
-      Save ident _ -> [ident]
-      _ -> []
+      Save ident _ -> S.singleton ident
+      _ -> S.empty
 
 emitI :: (Writer BB.Builder :> es) => BB.Builder -> [BB.Builder] -> Eff es ()
 emitI op args = tell $ "\t" <> op <> "\t" <> mconcat (intersperse ", " args) <> "\n"
@@ -193,15 +196,18 @@ emitBlock dest = \case
     NonTail reg -> emitNonTail reg inst
   Let rd inst body -> emitNonTail rd inst *> emitBlock dest body
 
-emitFun :: (Fresh :> es, Writer BB.Builder :> es) => Bool -> FunDef XReg FReg -> Eff es ()
+emitFun :: (Fresh :> es, Writer BB.Builder :> es, Log :> es) => Bool -> FunDef XReg FReg -> Eff es ()
 emitFun ebreak FunDef {binder, rhs, ret} = do
   let frame = mkFrame rhs
+  logMsg "emitFun"
+  logMsg $ show binder
+  logMsg $ show frame
   emitL binder
   emitI "addi" [build Sp, build Sp, "-" <> BB.intDec frame.size]
   emitI "sw" [build Ra, memFormat (frame.size - 4) Sp]
   runReader frame $ emitBlock (Tail ebreak ret) rhs
 
-emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
+emit :: (Fresh :> es, Log :> es) => Program XReg FReg -> Eff es BB.Builder
 emit (Program floats fundefs block) = execWriter do
   tell @BB.Builder ".section\t.rodata\n"
   forM_ floats \(float, label) ->
