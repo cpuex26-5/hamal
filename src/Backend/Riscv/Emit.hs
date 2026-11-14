@@ -146,6 +146,8 @@ emitNonTail rdM = \case
     emitI "flw" [build rd, memFormat offset Sp]
   FloatOfInt rs -> for_ (freg rdM) \rd -> emitI "fcvt.s.w" [build rd, build rs]
   IntOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fcvt.w.s" [build rd, build rs]
+  FloatOfBits rs -> for_ (freg rdM) \rd -> emitI "fmv.s.w" [build rd, build rs]
+  BitsOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fmv.w.s" [build rd, build rs]
   In -> do
     let rd = maybe Zero id (xreg rdM)
     emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]

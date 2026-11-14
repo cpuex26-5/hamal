@@ -146,6 +146,14 @@ vPrimOp c op = case (c, op) of
   (SFPR, B.Floor ident) -> pure $ Floor ident
   (SFPR, B.FloatOfInt int) -> pure $ FloatOfInt int
   (SGPR, B.IntOfFloat float) -> pure $ IntOfFloat float
+  (_, B.Coerce ident) ->
+    classOfVar ident <&> \(SomeClass src) -> case (src, c) of
+      (SGPR, SGPR) -> Mv (OpX ident)
+      (SFPR, SFPR) -> Mv (OpF ident)
+      (SGPR, SFPR) -> FloatOfBits ident
+      (SFPR, SGPR) -> BitsOfFloat ident
+      (_, SVoid) -> Nop
+      (SVoid, _) -> error "coerce: unit has no bits"
   (SGPR, B.In _) -> pure In
   (SVoid, B.Out ident) -> pure $ Out ident
   (SGPR, B.Array size initial) ->

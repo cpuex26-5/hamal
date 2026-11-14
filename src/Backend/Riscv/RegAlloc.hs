@@ -83,6 +83,8 @@ allocInst = \case
   FRestore ident -> pure $ FRestore ident
   FloatOfInt x -> FloatOfInt <$> rx T0 x
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f
+  FloatOfBits x -> FloatOfBits <$> rx T0 x
+  BitsOfFloat f -> BitsOfFloat <$> rf Ft0 f
   In -> pure In
   Out x -> Out <$> rx T0 x
   Alloc size -> pure (Alloc size)

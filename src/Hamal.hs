@@ -115,4 +115,9 @@ optimize limit = go 1
           logMsg $ "iteration #" <> show iter
           next <- foldM (\e (stg, pass) -> stage (stg iter) $ pass e) knorm passes
           if knorm == next then pure next else go (iter + 1) next
-    passes = [(STupleFlatten, fmap flattenLetTuple . flattenArgs), (SBeta, betaConvert), (SAssoc, pure . assocLet), (SElim, elimDeadCode)]
+    passes =
+      [ -- (STupleFlatten, fmap flattenLetTuple . flattenArgs)
+        (SBeta, betaConvert)
+      , (SAssoc, pure . assocLet)
+      , (SElim, elimDeadCode)
+      ]

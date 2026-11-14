@@ -91,6 +91,8 @@ data Inst (c :: RegClass) x f where
   FRestore :: Id -> Inst FPR x f
   FloatOfInt :: x -> Inst FPR x f
   IntOfFloat :: f -> Inst GPR x f
+  FloatOfBits :: x -> Inst FPR x f
+  BitsOfFloat :: f -> Inst GPR x f
 
 deriving stock instance (Show x, Show f) => Show (Inst c x f)
 
@@ -134,6 +136,8 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     FRestore ident -> P.insn "frestore" [pretty ident]
     FloatOfInt rs -> P.insn "float_of_int" [pretty rs]
     IntOfFloat rs -> P.insn "int_of_float" [pretty rs]
+    FloatOfBits rs -> P.insn "float_of_bits" [pretty rs]
+    BitsOfFloat rs -> P.insn "bits_of_float" [pretty rs]
 
 data FunDef x f where
   FunDef ::

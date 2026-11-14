@@ -155,6 +155,7 @@ infer (sspan :< expr) = case expr of
         arr `ascribe` T.Array (typeof val)
         idx `ascribe` T.Int
         pure T.Unit
+      B.Coerce {} -> freshTy
     inferApp fun args = do
       fun' <- infer fun
       args' <- mapM infer args
@@ -171,8 +172,9 @@ infer (sspan :< expr) = case expr of
       , ("floor", Floor ())
       , ("float_of_int", FloatOfInt ())
       , ("int_of_float", IntOfFloat ())
-      , ("print_byte", Out ())
       , ("read_byte", In ())
+      , ("print_byte", Out ())
+      , ("coerce", Coerce ())
       ]
     fill shape xs = case runStateT (traverse (const (StateT uncons)) shape) xs of
       Just (filled, []) -> Just filled

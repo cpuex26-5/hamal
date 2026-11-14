@@ -29,6 +29,7 @@ data PrimOp a
   | IntOfFloat a
   | In a
   | Out a
+  | Coerce a
   deriving stock (Show, Eq, Ord, Functor, Foldable, Traversable, Generic1)
   deriving (Show1) via Generically1 PrimOp
 
@@ -56,6 +57,7 @@ instance (Pretty a) => Pretty (PrimOp a) where
     IntOfFloat e -> "int_of_float" <+> pretty e
     In e -> "read_byte" <+> pretty e
     Out e -> "print_byte" <+> pretty e
+    Coerce e -> "coerce" <+> pretty e
 
 data Rel = Eq | Neq | Lt | Le | Gt | Ge
   deriving stock (Show, Eq, Ord)
