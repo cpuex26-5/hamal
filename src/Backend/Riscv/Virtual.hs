@@ -129,7 +129,7 @@ vBlock c = \case
   where
 
 vPrimOp :: (Reader Env :> es) => SingClass c -> B.PrimOp Id -> Eff es (Inst c Id Id)
-vPrimOp c e = case (c, e) of
+vPrimOp c op = case (c, op) of
   (SGPR, B.Not ident) -> pure $ Xori ident 1
   (SGPR, B.Neg ident) -> pure $ Neg ident
   (SFPR, B.FNeg ident) -> pure $ FNeg ident
@@ -142,15 +142,18 @@ vPrimOp c e = case (c, e) of
   (SFPR, B.FMul lhs rhs) -> pure $ FMul lhs rhs
   (SFPR, B.FDiv lhs rhs) -> pure $ FDiv lhs rhs
   (SFPR, B.FSqrt ident) -> pure $ FSqrt ident
+  (SFPR, B.FAbs ident) -> pure $ FAbs ident
+  (SFPR, B.Floor ident) -> pure $ Floor ident
   (SFPR, B.FloatOfInt int) -> pure $ FloatOfInt int
   (SGPR, B.IntOfFloat float) -> pure $ IntOfFloat float
+  (SGPR, B.In _) -> pure In
   (SVoid, B.Out ident) -> pure $ Out ident
   (SGPR, B.Array size initial) ->
     classOfVar initial <&> \case
       SomeClass SGPR -> MakeArray size (OpX initial)
       SomeClass SFPR -> MakeArray size (OpF initial)
       SomeClass SVoid -> Alloc 0
-  _ -> error $ "virtualOp(unreachable): " <> show (c, e)
+  _ -> error $ "virtualOp(unreachable): " <> show (c, op)
 
 vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)
 vFunc C.FunDef {binder, params, captured, rhs} = case binder.ty of

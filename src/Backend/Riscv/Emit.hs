@@ -131,7 +131,12 @@ emitNonTail rdM = \case
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
   FMul lhs rhs -> for_ (freg rdM) \rd -> emitI "fmul.s" [build rd, build lhs, build rhs]
   FDiv lhs rhs -> for_ (freg rdM) \rd -> emitI "fdiv.s" [build rd, build lhs, build rhs]
-  FSqrt rs -> for_ (freg rdM) \rd -> emitI "fsqrt" [build rd, build rs]
+  FSqrt rs -> for_ (freg rdM) \rd -> emitI "fsqrt.s" [build rd, build rs]
+  FAbs rs -> for_ (freg rdM) \rd -> emitI "fabs.s" [build rd, build rs]
+  Floor rs -> for_ (freg rdM) \rd -> do
+    -- サボっている
+    emitI "fcvt.w.s" [build T3, build rs]
+    emitI "fcvt.s.w" [build rd, build T3]
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
   FLwL offset label -> for_ (freg rdM) \rd -> do
     emitI "la" [build T1, build label]
@@ -141,6 +146,10 @@ emitNonTail rdM = \case
     emitI "flw" [build rd, memFormat offset Sp]
   FloatOfInt rs -> for_ (freg rdM) \rd -> emitI "fcvt.s.w" [build rd, build rs]
   IntOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fcvt.w.s" [build rd, build rs]
+  In -> do
+    let rd = maybe Zero id (xreg rdM)
+    emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
+    emitI "lw" [build rd, memFormat 4 T1]
   Out rs -> do
     emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
     emitI "sw" [build rs, memFormat 0 T1]

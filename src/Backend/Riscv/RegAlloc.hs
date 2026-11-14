@@ -9,10 +9,10 @@ xargRegs = [A0 .. A7]
 fargRegs :: [FReg]
 fargRegs = [Fa0 .. Fa7]
 
-assignRegs :: [a] -> [b] -> [(a, b)]
+assignRegs :: (Show b) => [a] -> [b] -> [(a, b)]
 assignRegs regs args
   | length regs >= length args = zip regs args
-  | otherwise = error "assignArgs: too many arguments"
+  | otherwise = error ("assignArgs: too many arguments" <> show args)
 
 data Restoring where
   Restoring :: Operand c XReg FReg -> Id -> Restoring
@@ -76,11 +76,14 @@ allocInst = \case
   FMul lhs rhs -> FMul <$> rf Ft0 lhs <*> rf Ft1 rhs
   FDiv lhs rhs -> FDiv <$> rf Ft0 lhs <*> rf Ft1 rhs
   FSqrt f -> FSqrt <$> rf Ft0 f
+  FAbs f -> FAbs <$> rf Ft0 f
+  Floor f -> Floor <$> rf Ft0 f
   FLw offset addr -> FLw offset <$> rx T0 addr
   FLwL offset label -> pure (FLwL offset label)
   FRestore ident -> pure $ FRestore ident
   FloatOfInt x -> FloatOfInt <$> rx T0 x
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f
+  In -> pure In
   Out x -> Out <$> rx T0 x
   Alloc size -> pure (Alloc size)
   MakeArray size (OpX x) -> MakeArray <$> rx T0 size <*> (OpX <$> rx T1 x)

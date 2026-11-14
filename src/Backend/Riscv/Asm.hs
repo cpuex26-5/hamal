@@ -60,6 +60,7 @@ data Inst (c :: RegClass) x f where
   Save :: Id -> Operand c x f -> Inst Void x f
   Alloc :: Int -> Inst GPR x f -- dst <- hp; hp <- hp + n
   MakeArray :: x -> Operand c x f -> Inst GPR x f
+  In :: Inst GPR x f
   Out :: x -> Inst Void x f
   -- GPR
   Li :: Int -> Inst GPR x f
@@ -82,6 +83,8 @@ data Inst (c :: RegClass) x f where
   FMul :: f -> f -> Inst FPR x f
   FDiv :: f -> f -> Inst FPR x f
   FSqrt :: f -> Inst FPR x f
+  FAbs :: f -> Inst FPR x f
+  Floor :: f -> Inst FPR x f
   FIf :: Rel -> f -> f -> Block c x f -> Block c x f -> Inst c x f
   FLw :: Int -> x -> Inst FPR x f
   FLwL :: Int -> Label -> Inst FPR x f
@@ -102,6 +105,7 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Save ident rs -> P.insn "save" [pretty ident, pretty rs]
     Alloc size -> P.insn "alloc" [pretty size]
     MakeArray size initial -> P.insn "makearray" [pretty size, pretty initial]
+    In -> P.insn "in" []
     Out rs -> P.insn "out" [pretty rs]
     Li imm -> P.insn "li" [pretty imm]
     La label -> P.insn "la" [pretty label]
@@ -122,6 +126,8 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     FMul rs1 rs2 -> P.insn "fmul" [pretty rs1, pretty rs2]
     FDiv rs1 rs2 -> P.insn "fdiv" [pretty rs1, pretty rs2]
     FSqrt rs -> P.insn "fsqrt" [pretty rs]
+    FAbs rs -> P.insn "fabs" [pretty rs]
+    Floor rs -> P.insn "floor" [pretty rs]
     FIf rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (FCmp rel) <+> pretty rs2) (pretty thn) (pretty els)
     FLw offset base -> P.insn "flw" [P.mem offset base]
     FLwL offset label -> P.insn "flwl" [P.mem offset label]
