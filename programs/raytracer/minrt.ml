@@ -12,7 +12,7 @@
 
 (*NOMINCAML open MiniMLRuntime;;*)
 (*NOMINCAML open Globals;;*)
-(*MINCAML*) let rec xor x y = if x then not y else y in
+(*MINCAML*) (* let rec xor x y = if x then not y else y in *)
 
 (******************************************************************************
    ユーティリティー
@@ -2127,9 +2127,9 @@ in
    格子状に並ぶような配列を使う。この配列では方角によるベクトルの密度の差が
    大きいので、これに補正を加えたものを最終的に用いる *)
 
-let rec tan x =
-  sin(x) /. cos(x)
-in
+(* let rec tan x = *)
+(*   sin(x) /. cos(x) *)
+(* in *)
 
 (* ベクトル達が出来るだけ球面状に一様に分布するよう座標を補正する *)
 let rec adjust_position h ratio =
@@ -2320,6 +2320,6 @@ in
 
 (* rt size_x size_y version *)
 (* version は 3 or 6 *)
-let _ = rt 512 512 3
+let _ = rt 128 128 3
 
 in ()

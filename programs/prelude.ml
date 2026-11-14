@@ -71,7 +71,36 @@ let rec read_float u =
   let rec power n = if n = 0 then 1. else 10.0 *. power (n - 1) in
   if exp = -1 then float_of_int acc else float_of_int acc /. power exp
 in
-let rec cos x = 1.0 -. x*.x *. (0.5 +. x*.x *. (0.041666667 -. x*.x *. 0.001371742))   in
-let rec sin x = x *. (1.0 -. x*.x *. (0.166666667 +. x*.x *. 0.008333333)) in
-let rec atan x = x *. (1.0 -. x*.x *. (0.333333333 +. x*.x *. (0.2 -. x*.x *. 0.142857143))) in
+let pi = 3.14159265 in
+let pi2 = pi *. 2.0 in
+let tau = pi /. 2.0 in
+let rec cos x =
+  let rec kernel x = 1.0 -. x*.x *. (0.5 -. x*.x *. (0.041666667 -. x*.x *. (0.001388889 -. x*.x*. 0.000024802))) in
+  let x = fabs x in
+  let x = x -. floor (x /. pi2) *. pi2 in
+  let x = if x <. pi then x else pi2 -. x in
+  let (coef, x) = if x <. tau then (1.0, x) else (-1.0, pi -. x) in
+  coef *. kernel x 
+  (* let c = kernel (x /. 2.0) in *)
+  (* coef *. (2.0 *. fsqr c -. 1.0) *)
+in
+let rec sin x = cos (tau -. x) in
+let rec tan x = 
+  let rec kernel x = x *. (1.0 +. x*.x *. (0.333333333 +. x*.x*. (0.133333333 +. x*.x*. 0.053968254))) in
+  let c0 = if x >. 0.0 then 1.0 else -1.0 in
+  let x = fabs x in
+  let x = x -. (floor (x /. pi)) *. pi in
+  let x = if x <. tau then x else x -. pi in
+  let c1 = if x >. 0.0 then 1.0 else -1.0 in
+  let x = fabs x in
+  let t = if  x <. tau /. 2.0 then kernel x else 1.0 /. (kernel (tau -. x)) in
+  c0 *. c1 *. t
+in
+let rec atan x =
+  let rec kernel x = x *. (1.0 -. x*.x *. (0.333333333 -. x*.x *. (0.2 -. x*.x *. 0.142857143))) in
+  let coef = if x >. 0.0 then 1.0 else -1.0 in
+  let x = fabs x in
+  let a = if x <. 1.0 then kernel x else tau -. kernel (1.0 /. x) in
+  coef *. a
+in
 let rec _dummy_for_infer f = float_of_int (read_int ()) +. read_float () +. f +. cos f +. sin f +. atan f in
