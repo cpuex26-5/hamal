@@ -71,11 +71,11 @@ let rec read_float u =
   let rec power n = if n = 0 then 1. else 10.0 *. power (n - 1) in
   if exp = -1 then float_of_int acc else float_of_int acc /. power exp
 in
-let pi = 3.14159265 in
+let pi = 3.1415925 in
 let pi2 = pi *. 2.0 in
 let tau = pi /. 2.0 in
 let rec cos x =
-  let rec kernel x = 1.0 -. x*.x *. (0.5 -. x*.x *. (0.041666667 -. x*.x *. (0.001388889 -. x*.x*. 0.000024802))) in
+  let rec kernel x = 1.0 -. x*.x *. (0.5 -. x*.x *. (0.0416667 -. x*.x *. (0.001388889 -. x*.x*. 0.000024802))) in
   let x = fabs x in
   let x = x -. floor (x /. pi2) *. pi2 in
   let x = if x <. pi then x else pi2 -. x in
@@ -86,7 +86,7 @@ let rec cos x =
 in
 let rec sin x = cos (tau -. x) in
 let rec tan x = 
-  let rec kernel x = x *. (1.0 +. x*.x *. (0.333333333 +. x*.x*. (0.133333333 +. x*.x*. 0.053968254))) in
+  let rec kernel x = x *. (1.0 +. x*.x *. (0.33333333 +. x*.x*. (0.133333333 +. x*.x*. 0.053968254))) in
   let c0 = if x >. 0.0 then 1.0 else -1.0 in
   let x = fabs x in
   let x = x -. (floor (x /. pi)) *. pi in
@@ -97,7 +97,7 @@ let rec tan x =
   c0 *. c1 *. t
 in
 let rec atan x =
-  let rec kernel x = x *. (1.0 -. x*.x *. (0.333333333 -. x*.x *. (0.2 -. x*.x *. 0.142857143))) in
+  let rec kernel x = x *. (1.0 -. x*.x *. (0.33333333 -. x*.x *. (0.2 -. x*.x *. 0.142857143))) in
   let coef = if x >. 0.0 then 1.0 else -1.0 in
   let x = fabs x in
   let a = if x <. 1.0 then kernel x else tau -. kernel (1.0 /. x) in
