@@ -34,17 +34,44 @@ let rec print_int n =
     let _ = put_digits n 1 in
     ())
 in
+let rec or' x y = if x then true else y in
+(* read_int, read_float は入力が valid にあることに強く依存している…… *)
 let rec read_int u =
-  let f0 = read_byte () in
-  let f1 = read_byte () in
-  let f2 = read_byte () in
-  let f3 = read_byte () in
-  (f0 * 16777216) + (f1 * 65536) + (f2 * 256) + f3
+  let rec aux in_token acc =
+    let byte = read_byte () in
+    if
+      or'
+        (byte = 32 (* ' ' *))
+        (or' (byte = 9 (* '\t' *)) (or' (byte = 13 (* '\r' *)) (byte = 10 (* '\n' *))))
+    then if in_token then acc else aux false acc
+    else if byte = 45 (* '-' *)
+    then -aux true acc
+    else aux true ((acc * 8) + (acc * 2) + (byte - 48))
+  in
+  aux false 0
 in
-let rec read_float u = coerce (read_int ()) in
+let rec read_float u =
+  let rec aux in_token exp acc =
+    let byte = read_byte () in
+    if
+      or'
+        (byte = 32 (* ' ' *))
+        (or' (byte = 9 (* '\t' *)) (or' (byte = 13 (* '\r' *)) (byte = 10 (* '\n' *))))
+    then if in_token then acc, exp else aux false (-1) acc
+    else if byte = 45 (* '-' *)
+    then (
+      let (acc', exp') = aux true (-1) acc in
+      -acc', exp')
+    else if byte = 46
+    then (* '.' *)
+      aux true 0 acc
+    else aux true (if exp >= 0 then exp + 1 else -1) ((acc * 8) + (acc * 2) + (byte - 48))
+  in
+  let (acc, exp) = aux false (-1) 0 in
+  let rec power n = if n = 0 then 1. else 10.0 *. power (n - 1) in
+  if exp = -1 then float_of_int acc else float_of_int acc /. power exp
+in
 let rec cos x = 1.0 in
 let rec sin x = x in
 let rec atan x = x in
-let rec _dummy_for_infer f = 
-  read_float () +. f +. cos f +. sin f +. atan f
-in
+let rec _dummy_for_infer f = float_of_int (read_int ()) +. read_float () +. f +. cos f +. sin f +. atan f in
