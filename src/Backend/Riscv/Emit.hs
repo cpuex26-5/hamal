@@ -138,9 +138,14 @@ emitNonTail rdM = \case
   FSqrt rs -> for_ (freg rdM) \rd -> emitI "fsqrt.s" [build rd, build rs]
   FAbs rs -> for_ (freg rdM) \rd -> emitI "fabs.s" [build rd, build rs]
   Floor rs -> for_ (freg rdM) \rd -> do
-    -- サボっている
+    label <- Local <$> fresh "floorL"
     emitI "fcvt.w.s" [build T3, build rs]
     emitI "fcvt.s.w" [build rd, build T3]
+    emitI "fle.s" [build T4, build rd, build rs]
+    emitI "bnez" [build T4, build label]
+    emitI "addi" [build T3, build T3, BB.intDec 1]
+    emitI "fcvt.s.w" [build rd, build T3]
+    emitL label
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
   FLwL offset label -> for_ (freg rdM) \rd -> do
     emitI "la" [build T1, build label]
