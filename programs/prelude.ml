@@ -71,7 +71,7 @@ let rec read_float u =
   let rec power n = if n = 0 then 1. else 10.0 *. power (n - 1) in
   if exp = -1 then float_of_int acc else float_of_int acc /. power exp
 in
-let rec cos x = 1.0 in
-let rec sin x = x in
-let rec atan x = x in
+let rec cos x = 1.0 -. x*.x *. (0.5 +. x*.x *. (0.041666667 -. x*.x *. 0.001371742))   in
+let rec sin x = x *. (1.0 -. x*.x *. (0.166666667 +. x*.x *. 0.008333333)) in
+let rec atan x = x *. (1.0 -. x*.x *. (0.333333333 +. x*.x *. (0.2 -. x*.x *. 0.142857143))) in
 let rec _dummy_for_infer f = float_of_int (read_int ()) +. read_float () +. f +. cos f +. sin f +. atan f in
