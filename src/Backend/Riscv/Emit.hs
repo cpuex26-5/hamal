@@ -4,6 +4,7 @@ import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand
 import Basic (Rel (..))
 import Buildable (Buildable (build))
 import Control.Monad (forM_)
+import Data.Bool (bool)
 import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
 import Data.List (intersperse)
@@ -16,7 +17,7 @@ import Name (Fresh, Id, Label (..), fresh)
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
 
 data Dest c where
-  Tail :: SingClass c -> Dest c
+  Tail :: Bool -> SingClass c -> Dest c
   NonTail :: Maybe (Operand c XReg FReg) -> Dest c
 
 regHp :: XReg
@@ -180,7 +181,7 @@ emitNonTail rdM = \case
 emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest c -> Block c XReg FReg -> Eff es ()
 emitBlock dest = \case
   Ans inst -> case dest of
-    Tail c -> do
+    Tail ebreak c -> do
       case c of
         SGPR -> emitNonTail (Just (OpX A0)) inst
         SFPR -> emitNonTail (Just (OpF Fa0)) inst
@@ -188,17 +189,17 @@ emitBlock dest = \case
       size <- asks @Frame (.size)
       emitI "lw" [build Ra, memFormat (size - 4) Sp]
       emitI "addi" [build Sp, build Sp, BB.intDec size]
-      tell @BB.Builder "\tret\n"
+      tell @BB.Builder $ bool "\tret\n" "\tebreak\n" ebreak
     NonTail reg -> emitNonTail reg inst
   Let rd inst body -> emitNonTail rd inst *> emitBlock dest body
 
-emitFun :: (Fresh :> es, Writer BB.Builder :> es) => FunDef XReg FReg -> Eff es ()
-emitFun FunDef {binder, rhs, ret} = do
+emitFun :: (Fresh :> es, Writer BB.Builder :> es) => Bool -> FunDef XReg FReg -> Eff es ()
+emitFun ebreak FunDef {binder, rhs, ret} = do
   let frame = mkFrame rhs
   emitL binder
   emitI "addi" [build Sp, build Sp, "-" <> BB.intDec frame.size]
   emitI "sw" [build Ra, memFormat (frame.size - 4) Sp]
-  runReader frame $ emitBlock (Tail ret) rhs
+  runReader frame $ emitBlock (Tail ebreak ret) rhs
 
 emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
 emit (Program floats fundefs block) = execWriter do
@@ -207,8 +208,8 @@ emit (Program floats fundefs block) = execWriter do
     tell @BB.Builder $ build label <> ":\t.word 0x" <> BB.floatHexFixed float <> "\t# " <> BB.floatDec float <> "\n"
   tell @BB.Builder ".section\t.text\n"
   tell @BB.Builder ".global\tmin_caml_start\n"
-  emitFun main
-  mapM_ emitFun fundefs
+  emitFun True main
+  mapM_ (emitFun False) fundefs
   where
     main =
       FunDef
