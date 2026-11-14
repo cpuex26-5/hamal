@@ -19,9 +19,8 @@ data Dest c where
   Tail :: SingClass c -> Dest c
   NonTail :: Maybe (Operand c XReg FReg) -> Dest c
 
-regHp, regCl :: XReg
+regHp :: XReg
 regHp = Gp
-regCl = Tp
 
 mkFrame :: Block c x f -> Frame
 mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
@@ -122,10 +121,8 @@ emitNonTail rdM = \case
     for_ rdM \case
       OpX x -> emitI "mv" [build x, build A0]
       OpF f -> emitI "fmv.s" [build f, build Fa0]
-  CallCls cls _ _ -> do
-    emitI "lw" [build T0, memFormat 0 regCl]
-    emitI "jalr" [build Ra, memFormat 0 T0]
-    emitI "call" [build cls]
+  CallInd code _ _ -> do
+    emitI "jalr" [build code]
     for_ rdM \case
       OpX x -> emitI "mv" [build x, build A0]
       OpF f -> emitI "fmv.s" [build f, build Fa0]

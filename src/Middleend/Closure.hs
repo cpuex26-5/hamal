@@ -1,4 +1,4 @@
-module Middleend.Closure (Closure (..), Exp (..), FunDef (..), Program (..), closureConvert) where
+module Middleend.Closure (Closure (..), Exp (..), Captured (..), FunDef (..), Program (..), closureConvert) where
 
 import Basic (Binder (..), Cmp, FunBind (..), PrimOp)
 import Data.Bifunctor (first)
@@ -52,22 +52,28 @@ instance Pretty Exp where
     AppDir fun args -> hsep (pretty fun : (pretty <$> args))
     AppCls fun args -> hsep (pretty fun : (pretty <$> args))
 
+data Captured = Captured
+  { self :: Id
+  , formalFv :: [Binder Id Type]
+  }
+  deriving stock (Eq, Show)
+
 data FunDef = FunDef
   { binder :: Binder Id Type
   , params :: [Binder Id Type]
-  , formalFv :: [Binder Id Type]
+  , captured :: Maybe Captured
   , rhs :: Exp
   }
   deriving stock (Eq, Show)
 
 instance Pretty FunDef where
-  pretty FunDef {binder, params, formalFv, rhs} = nest 2 (header <> hardline <> pretty rhs)
+  pretty FunDef {binder, params, captured, rhs} = nest 2 (header <> hardline <> pretty rhs)
     where
       header =
         group . nest 2 $
           vsep
             [ "fundef" <+> pretty binder.name
-            , P.braced (pretty <$> formalFv)
+            , P.braced (pretty <$> maybe [] id ((.formalFv) <$> captured))
             , hsep (parens . pretty <$> params) <+> "="
             ]
 
@@ -151,13 +157,14 @@ closureConvert kexp = do
         body' <- local (with binder) (go body)
         let fv = S.toList $ S.difference (freeVars rhs') (S.fromList $ (.name) <$> binder : params)
         typedFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable): " <> show name) name env}) <$> fv)
-        output $ FunDef {binder, params, formalFv = typedFv, rhs = rhs'}
         if binder.name `S.member` (freeVars body')
           then do
             logMsg $ "making closure: " <> show binder
+            output $ FunDef {binder, params, captured = Just (Captured binder.name typedFv), rhs = rhs'}
             pure $ LetCls binder Closure {entry = Local binder.name, actualFv = typedFv} body'
           else do
             logMsg $ "eliminating closure: " <> show binder
+            output $ FunDef {binder, params, captured = Nothing, rhs = rhs'}
             pure body'
       K.LetTuple binders rhs body -> LetTuple binders rhs <$> local (foldMap with binders) (go body)
       K.App fun args | fun `S.member` known -> logMsg ("directly applying: " <> show (K.App fun args)) $> AppDir (Local fun) args
