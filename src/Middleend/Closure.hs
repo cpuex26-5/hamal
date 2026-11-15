@@ -109,7 +109,7 @@ knownFuns kexp = S.map (.binder) $ stabilize phi allFunDef
         go = \case
           (K.Unit; K.Int {}; K.Float {}; K.Var {}; K.PrimOp {}; K.App {}) -> S.empty
           K.If _ _ _ thn els -> S.union (go thn) (go els)
-          K.Let _ _ body -> go body
+          K.Let _ rhs body -> go rhs <> go body
           K.LetTuple _ _ body -> go body
           K.LetRec fundef body -> S.insert (first (.name) fundef) (go body)
 
@@ -126,8 +126,7 @@ knownFuns kexp = S.map (.binder) $ stabilize phi allFunDef
           K.LetRec FunBind {binder, params, rhs} body ->
             if binder.name `S.member` fvBody
               then S.delete binder.name $ S.union actualFv fvBody
-              else
-                fvBody
+              else fvBody
             where
               fvBody = go body
               actualFv = (go rhs) `S.difference` (S.fromList $ binder.name : ((.name) <$> params))
