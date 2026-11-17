@@ -6,7 +6,7 @@ import Data.ByteString.Builder (string7)
 import Data.Char (toLower)
 import Name (Id, Label)
 import Pretty qualified as P
-import Prettyprinter (Pretty (..), align, concatWith, hardline, nest, surround, tupled, (<+>))
+import Prettyprinter (Pretty (..), align, hardline, nest, tupled, (<+>))
 
 data RegClass = GPR | FPR | Void
   deriving stock (Show, Eq)
@@ -78,6 +78,7 @@ data Inst (c :: RegClass) x f where
   LwL :: Int -> Label -> Inst GPR x f
   Restore :: Id -> Inst GPR x f
   -- FPR
+  Fli :: Float -> Inst FPR x f
   FAdd :: f -> f -> Inst FPR x f
   FNeg :: f -> Inst FPR x f
   FSub :: f -> f -> Inst FPR x f
@@ -124,6 +125,7 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Lw offset base -> P.insn "lw" [P.mem offset base]
     LwL offset label -> P.insn "lwl" [P.mem offset label]
     Restore ident -> P.insn "restore" [pretty ident]
+    Fli imm -> P.insn "fli" [pretty imm]
     FAdd rs1 rs2 -> P.insn "fadd" [pretty rs1, pretty rs2]
     FNeg rs -> P.insn "fneg" [pretty rs]
     FSub rs1 rs2 -> P.insn "fsub" [pretty rs1, pretty rs2]
@@ -166,14 +168,13 @@ instance (Pretty x, Pretty f) => Pretty (FunDef x f) where
         <> hardline
         <> pretty rhs
 
-data Program x f = Program [(Float, Label)] [FunDef x f] (Block Void x f)
+data Program x f = Program [FunDef x f] (Block Void x f)
   deriving stock (Show)
 
 instance (Pretty x, Pretty f) => Pretty (Program x f) where
-  pretty (Program floats fundefs main) =
+  pretty (Program fundefs main) =
     P.paragraphs $
-      [concatWith (surround hardline) [pretty label <+> "=" <+> pretty float | (float, label) <- floats] | not (null floats)]
-        <> (pretty <$> fundefs)
+      (pretty <$> fundefs)
         <> [nest 2 ("main =" <> hardline <> pretty main)]
 
 data XReg

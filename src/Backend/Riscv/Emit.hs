@@ -3,8 +3,9 @@ module Backend.Riscv.Emit (emit) where
 import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), RegClass (..), SingClass (..), XReg (..))
 import Basic (Rel (..))
 import Buildable (Buildable (build))
-import Control.Monad (forM_)
+import Data.Bits (shiftL, shiftR, (.&.))
 import Data.Bool (bool)
+import Data.ByteString.Builder (string7)
 import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
 import Data.List (intersperse)
@@ -13,7 +14,9 @@ import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
+import GHC.Float (castFloatToWord32)
 import Name (Fresh, Id, Label (..), fresh)
+import Text.Printf (printf)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
   deriving stock (Show)
@@ -130,6 +133,13 @@ emitNonTail rdM = \case
     for_ rdM \case
       OpX x -> emitI "mv" [build x, build A0]
       OpF f -> emitI "fmv.s" [build f, build Fa0]
+  Fli imm -> for_ (freg rdM) \rd -> do
+    let bits = castFloatToWord32 imm
+    let high = bits `shiftR` 12
+    let low = fromIntegral (bits .&. 0xfff) - fromIntegral (bits .&. (1 `shiftL` 11))
+    emitI "lui" [build T0, string7 $ printf "0x%05x" high]
+    emitI "addi" [build T0, build T0, BB.intDec low]
+    emitI "fmv.w.x" [build rd, build T0]
   FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
   FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
@@ -172,13 +182,16 @@ emitNonTail rdM = \case
     emitI "mv" [build T3, build regHp]
     emitI "slli" [build size, build size, BB.intDec 2]
     emitI "add" [build regHp, build regHp, build size]
-    loop <- Local <$> fresh "loop"
+    loop <- Local <$> fresh "makearray.start"
+    loopEnd <- Local <$> fresh "makearray.end"
+    emitI "beqz" [build size, build loopEnd]
     emitL loop
     case initial of
       OpX x -> emitI "sw" [build x, memFormat 0 T3]
       OpF f -> emitI "fsw" [build f, memFormat 0 T3]
     emitI "addi" [build T3, build T3, BB.intDec 4]
     emitI "ble" [build T3, build regHp, build loop]
+    emitL loopEnd
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
     xreg = fmap \(OpX r) -> r
@@ -210,10 +223,7 @@ emitFun ebreak FunDef {binder, rhs, ret} = do
   runReader frame $ emitBlock (Tail ebreak ret) rhs
 
 emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
-emit (Program floats fundefs block) = execWriter do
-  tell @BB.Builder ".section\t.rodata\n"
-  forM_ floats \(float, label) ->
-    tell @BB.Builder $ build label <> ":\t.word 0x" <> BB.floatHexFixed float <> "\t# " <> BB.floatDec float <> "\n"
+emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
   tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun True main

@@ -3,19 +3,16 @@ module Backend.Riscv.Virtual (virtualify) where
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Operand (..), Program (..), SingClass (..), SomeClass (..))
 import Basic (Binder (..), Cmp (..))
 import Basic qualified as B
-import Data.Functor (($>), (<&>))
+import Data.Functor ((<&>))
 import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
-import Effectful.State.Static.Local (State, gets, modify, runState)
 import Middleend.Closure (Captured (..))
 import Middleend.Closure qualified as C
 import Name (Fresh, Id, Label (..), fresh)
 import Type qualified as T
 
 type Env = M.Map Id SomeClass
-
-type Fnv = M.Map Float Label
 
 classOf :: T.Type -> SomeClass
 classOf (T.Type ty) = case ty of
@@ -43,16 +40,11 @@ insertLet dst (Let d i rest) k = Let d i (insertLet dst rest k)
 classOfVar :: (Reader Env :> es) => Id -> Eff es SomeClass
 classOfVar = asks . M.findWithDefault (error "unreachable")
 
-vBlock :: (Fresh :> es, Reader Env :> es, State Fnv :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
+vBlock :: (Fresh :> es, Reader Env :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
 vBlock c = \case
   C.Unit | SVoid <- c -> pure $ Ans Nop
   C.Int int | SGPR <- c -> pure $ Ans (Li int)
-  C.Float float | SFPR <- c -> Ans . (FLwL 0) <$> (maybe new pure =<< gets @Fnv (M.lookup float))
-    where
-      new = do
-        label <- Local <$> fresh "Lf"
-        modify (M.insert float label)
-          $> label
+  C.Float float | SFPR <- c -> pure $ Ans (Fli float)
   C.Var ident | SGPR <- c -> pure . Ans . Mv . OpX $ ident
   C.Var ident | SFPR <- c -> pure . Ans . Mv . OpF $ ident
   C.PrimOp (B.Tuple binders) | SGPR <- c -> do
@@ -164,7 +156,7 @@ vPrimOp c op = case (c, op) of
       SomeClass SVoid -> Alloc 0
   _ -> error $ "virtualOp(unreachable): " <> show (c, op)
 
-vFunc :: (Fresh :> es, State Fnv :> es) => C.FunDef -> Eff es (FunDef Id Id)
+vFunc :: (Fresh :> es) => C.FunDef -> Eff es (FunDef Id Id)
 vFunc C.FunDef {binder, params, captured, rhs} = case binder.ty of
   T.Type (T.Fun _ ret)
     | Nothing <- captured
@@ -191,8 +183,5 @@ vFunc C.FunDef {binder, params, captured, rhs} = case binder.ty of
 
 virtualify :: (Fresh :> es) => C.Program -> Eff es (Program Id Id)
 virtualify (C.Program fundefs expr) = do
-  ((fundefs', main), floats) <-
-    runState @Fnv M.empty
-      $ runReader @Env M.empty
-      $ (,) <$> traverse vFunc fundefs <*> vBlock SVoid expr
-  pure $ Program (M.toList floats) fundefs' main
+  (fundefs', main) <- runReader @Env M.empty $ (,) <$> traverse vFunc fundefs <*> vBlock SVoid expr
+  pure $ Program fundefs' main
