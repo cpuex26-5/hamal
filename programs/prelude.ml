@@ -39,7 +39,7 @@ let rec read_int u =
   let f1 = read_byte () in
   let f2 = read_byte () in
   let f3 = read_byte () in
-  (f0 * 16777216) + (f1 * 65536) + (f2 * 256) + f3
+  (f3 * 16777216) + (f2 * 65536) + (f1 * 256) + f0
 in
 let rec read_float u = coerce (read_int ())
 in
