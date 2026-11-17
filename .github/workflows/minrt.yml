@@ -1,0 +1,39 @@
+name: minrt
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: minrt
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: "9.14.1"
+          cabal-version: latest
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ runner.os }}-ghc-9.14.1-${{ hashFiles('cabal.project.freeze') }}
+          restore-keys: ${{ runner.os }}-ghc-9.14.1-
+      - run: cabal update && cabal build exe:hamal
+      - name: Compile minrt
+        run: |
+          cat programs/prelude.ml programs/raytracer/globals.ml programs/raytracer/minrt.ml \
+            | "$(cabal list-bin exe:hamal)" > minrt.s
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload nightly minrt.s --clobber
+          gh release lt from ${GITHUB_SHA}"
