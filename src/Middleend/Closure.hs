@@ -121,7 +121,7 @@ knownFuns statics kexp = S.map (.binder) $ stabilize monotonic top
           K.If _ _ _ thn els -> S.union (go thn) (go els)
           K.Let _ rhs body -> go rhs <> go body
           K.LetTuple _ _ body -> go body
-          K.LetRec fundef body -> S.insert (first (.name) fundef) (go body)
+          K.LetRec funbind body -> go funbind.rhs <> S.insert (first (.name) funbind) (go body)
 
     monotonic known = S.filter (\K.FunBind {params, rhs} -> fvK known rhs `S.isSubsetOf` S.fromList params) known
     fvK known expr = go expr S.\\ statics
