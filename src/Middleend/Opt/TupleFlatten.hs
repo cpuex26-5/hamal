@@ -6,6 +6,7 @@ import Basic (
  )
 import Control.Monad (when, zipWithM)
 import Data.Map.Strict qualified as M
+import Data.Maybe (fromMaybe)
 import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, local, runReader)
@@ -24,7 +25,7 @@ unknownFun = go S.empty
       Let _ rhs body -> go env rhs <> go env body
       LetRec funbind body -> go (S.insert funbind.binder.name env) body
       LetTuple _ _ body -> go env body
-      App _ args -> S.fromList $ filter (\arg -> S.member arg env) args
+      App _ args -> S.fromList $ filter (`S.member` env) args
 
 data ParamPos = Keep | Spread [T.Type]
 
@@ -45,11 +46,11 @@ flattenArgs expr = runReader @Env M.empty (go expr)
       If cmp lhs rhs thn els -> If cmp lhs rhs <$> go thn <*> go els
       Let binder rhs body -> Let binder <$> go rhs <*> go body
       LetTuple binders rhs body -> LetTuple binders rhs <$> go body
-      LetRec fb body | (fb.binder.name `S.member` unknowns) -> LetRec fb <$> go body
+      LetRec fb body | fb.binder.name `S.member` unknowns -> LetRec fb <$> go body
       LetRec FunBind {binder, params, rhs} body -> do
         let ps = genPos <$> params
         ms <- zipWithM (\param -> spread param.name) params ps
-        let params' = concat $ zipWith (\param -> maybe [param] id) params ms
+        let params' = concat $ zipWith (\param -> fromMaybe [param]) params ms
         when (any (\case Keep -> False; Spread {} -> True) ps)
           $ logMsg
           $ "spreading " <> show binder.name <> ": " <> show params <> " -> " <> show params'

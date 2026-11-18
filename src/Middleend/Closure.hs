@@ -75,7 +75,7 @@ instance Pretty FunDef where
         group . nest 2 $
           vsep
             [ "fundef" <+> pretty binder.name
-            , P.braced (pretty <$> maybe [] id ((.formalFv) <$> captured))
+            , P.braced (pretty <$> maybe [] (.formalFv) captured)
             , hsep (parens . pretty <$> params) <+> "="
             ]
 
@@ -102,7 +102,7 @@ freeVars = \case
   PrimOp op -> foldMap S.singleton op
   If _ lhs rhs thn els -> S.singleton lhs <> S.singleton rhs <> freeVars thn <> freeVars els
   Let binder rhs body -> S.delete binder.name (freeVars rhs <> freeVars body)
-  LetTuple binders rhs body -> (S.singleton rhs <> freeVars body) S.\\ (S.fromList ((.name) <$> binders))
+  LetTuple binders rhs body -> (S.singleton rhs <> freeVars body) S.\\ S.fromList ((.name) <$> binders)
   LetCls binder Closure {actualFv} body -> S.delete binder.name (S.union (S.fromList ((.name) <$> actualFv)) (freeVars body))
   AppDir _ args -> S.fromList args
   AppCls cls args -> S.fromList $ cls : args
@@ -123,24 +123,24 @@ knownFuns statics kexp = S.map (.binder) $ stabilize monotonic top
           K.LetTuple _ _ body -> go body
           K.LetRec fundef body -> S.insert (first (.name) fundef) (go body)
 
-    monotonic known = S.filter (\K.FunBind {params, rhs} -> (fvK known rhs) `S.isSubsetOf` (S.fromList params)) known
+    monotonic known = S.filter (\K.FunBind {params, rhs} -> fvK known rhs `S.isSubsetOf` S.fromList params) known
     fvK known expr = go expr S.\\ statics
       where
-        isKnown f = f `S.member` (S.map (.binder) known)
+        isKnown f = f `S.member` S.map (.binder) known
         go = \case
           (K.Unit; K.Int {}; K.Float {}) -> S.empty
           K.Var ident -> S.singleton ident
           K.PrimOp op -> foldMap S.singleton op
           K.If _ lhs rhs thn els -> S.fromList [lhs, rhs] <> go thn <> go els
-          K.Let binder rhs body -> (go rhs) <> (S.delete binder.name (go body))
+          K.Let binder rhs body -> go rhs <> (S.delete binder.name (go body))
           K.LetRec FunBind {binder, params, rhs} body ->
             if binder.name `S.member` fvBody
               then S.delete binder.name $ S.union actualFv fvBody
               else fvBody
             where
               fvBody = go body
-              actualFv = (go rhs) S.\\ (S.fromList $ binder.name : ((.name) <$> params))
-          K.LetTuple binders rhs body -> (S.singleton rhs) <> ((go body) S.\\ (S.fromList $ (.name) <$> binders))
+              actualFv = go rhs S.\\ S.fromList (binder.name : ((.name) <$> params))
+          K.LetTuple binders rhs body -> S.singleton rhs <> go body S.\\ S.fromList ((.name) <$> binders)
           K.App fun args | isKnown fun -> S.fromList args
           K.App fun args -> S.fromList $ fun : args
 
@@ -177,9 +177,9 @@ closureConvert kexp = do
       K.LetRec FunBind {binder, params, rhs} body -> do
         rhs' <- local (foldMap with (binder : params)) (go rhs)
         body' <- local (with binder) (go body)
-        let fv = S.toList $ freeVars rhs' S.\\ M.keysSet statics S.\\ (S.fromList $ (.name) <$> binder : params)
+        let fv = S.toList $ freeVars rhs' S.\\ M.keysSet statics S.\\ S.fromList ((.name) <$> binder : params)
         typedFv <- asks (\env -> (\name -> Binder {name, ty = M.findWithDefault (error $ "closure(unreachable): " <> show name) name env}) <$> fv)
-        if binder.name `S.member` (freeVars body')
+        if binder.name `S.member` freeVars body'
           then do
             logMsg $ "making closure: " <> show binder
             output $ FunDef {binder, params, captured = Just (Captured binder.name typedFv), rhs = rhs'}

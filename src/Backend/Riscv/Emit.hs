@@ -10,6 +10,7 @@ import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
 import Data.List (intersperse)
 import Data.Map.Strict qualified as M
+import Data.Maybe (fromMaybe)
 import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
@@ -168,7 +169,7 @@ emitNonTail rdM = \case
   FloatOfBits rs -> for_ (freg rdM) \rd -> emitI "fmv.w.x" [build rd, build rs]
   BitsOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fmv.x.w" [build rd, build rs]
   In -> do
-    let rd = maybe Zero id (xreg rdM)
+    let rd = fromMaybe Zero (xreg rdM)
     emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
     emitI "lw" [build rd, memFormat 4 T1]
   Out rs -> do

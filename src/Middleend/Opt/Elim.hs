@@ -35,11 +35,11 @@ elimDeadCode = go
       Let binder rhs body -> do
         rhs' <- go rhs
         body' <- go body
-        prune (not (isPure rhs') || binder.name `S.member` (freeVars body')) binder (Let binder rhs' body') body'
+        prune (not (isPure rhs') || binder.name `S.member` freeVars body') binder (Let binder rhs' body') body'
       LetRec fb@FunBind {binder, rhs} body -> do
         rhs' <- go rhs
         body' <- go body
-        prune (binder.name `S.member` (freeVars body')) binder (LetRec fb {rhs = rhs'} body') body'
+        prune (binder.name `S.member` freeVars body') binder (LetRec fb {rhs = rhs'} body') body'
       LetTuple binders rhs body -> do
         body' <- go body
         let bodyFv = freeVars body'

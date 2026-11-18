@@ -51,9 +51,9 @@ freeVars = \case
   Var ident -> S.singleton ident
   PrimOp op -> foldMap S.singleton op
   If _ lhs rhs thn els -> S.fromList [lhs, rhs] <> freeVars thn <> freeVars els
-  Let binder rhs body -> (freeVars rhs) <> (S.delete binder.name (freeVars body))
-  LetRec FunBind {binder, params, rhs} body -> (S.difference (freeVars rhs) (S.fromList $ (.name) <$> binder : params)) <> (S.delete binder.name (freeVars body))
-  LetTuple binders rhs body -> (S.singleton rhs) <> (S.difference (freeVars body) (S.fromList $ (.name) <$> binders))
+  Let binder rhs body -> freeVars rhs <> (S.delete binder.name (freeVars body))
+  LetRec FunBind {binder, params, rhs} body -> S.difference (freeVars rhs) (S.fromList $ (.name) <$> binder : params) <> (S.delete binder.name (freeVars body))
+  LetTuple binders rhs body -> S.singleton rhs <> (freeVars body S.\\ S.fromList ((.name) <$> binders))
   App fun args -> S.fromList $ fun : args
 
 insertLet :: (Fresh :> es) => Type -> Eff es Exp -> (Id -> Eff es Exp) -> Eff es Exp
