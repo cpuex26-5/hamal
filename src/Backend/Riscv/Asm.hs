@@ -164,11 +164,15 @@ instance (Pretty x, Pretty f) => Pretty (FunDef x f) where
         <> hardline
         <> pretty rhs
 
-data Program x f = Program [FunDef x f] (Block Void x f)
+data Program x f = Program
+  { heapBase :: Int
+  , fundefs :: [FunDef x f]
+  , main :: Block Void x f
+  }
   deriving stock (Show)
 
 instance (Pretty x, Pretty f) => Pretty (Program x f) where
-  pretty (Program fundefs main) =
+  pretty (Program _ fundefs main) =
     P.paragraphs $
       (pretty <$> fundefs)
         <> [nest 2 ("main =" <> hardline <> pretty main)]

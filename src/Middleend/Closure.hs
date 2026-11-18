@@ -1,7 +1,7 @@
 module Middleend.Closure (Closure (..), Exp (..), Captured (..), FunDef (..), Program (..), closureConvert, freeVars) where
 
 import Basic (Binder (..), Cmp, FunBind (..), PrimOp (..))
-import Data.Bifunctor (first)
+import Data.Bifunctor (Bifunctor (second), first)
 import Data.Functor (($>))
 import Data.List (sortOn)
 import Data.Map.Strict qualified as M
@@ -81,6 +81,7 @@ instance Pretty FunDef where
 
 data Program = Program
   { statics :: M.Map Id Int
+  , heapBase :: Int
   , fundefs :: [FunDef]
   , main :: Exp
   }
@@ -144,8 +145,8 @@ knownFuns statics kexp = S.map (.binder) $ stabilize monotonic top
           K.App fun args | isKnown fun -> S.fromList args
           K.App fun args -> S.fromList $ fun : args
 
-staticAlloc :: K.Exp -> M.Map Id Int
-staticAlloc = M.fromList . snd . mapAccumL (\offset (ident, size) -> (offset + size, (ident, offset))) 0 . go M.empty
+staticAlloc :: K.Exp -> (Int, M.Map Id Int)
+staticAlloc = second M.fromList . mapAccumL (\offset (ident, size) -> (offset + size, (ident, offset))) 0 . go M.empty
   where
     go consts = \case
       (K.Unit; K.Int {}; K.Float {}; K.Var {}; K.PrimOp {}; K.If {}; K.App {}) -> []
@@ -161,9 +162,9 @@ type Env = M.Map Id Type
 closureConvert :: (Log :> es) => K.Exp -> Eff es Program
 closureConvert kexp = do
   (cexp, fundefs) <- runOutput $ runReader @Env M.empty $ go kexp
-  pure $ Program statics fundefs cexp
+  pure $ Program statics heapBase fundefs cexp
   where
-    statics = staticAlloc kexp
+    (heapBase, statics) = staticAlloc kexp
     known = knownFuns (M.keysSet statics) kexp
     go :: (Output FunDef :> es, Reader (M.Map Id Type) :> es, Log :> es) => K.Exp -> Eff es Exp
     go = \case

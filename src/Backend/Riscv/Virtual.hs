@@ -241,9 +241,9 @@ vFunc C.FunDef {binder, params, captured, rhs} = case binder.ty of
   _ -> error "unreachable(vFunc): rhs of FunDef is not a function."
 
 virtualify :: (Fresh :> es) => C.Program -> Eff es (Program Id Id)
-virtualify (C.Program statics fundefs expr) = do
+virtualify (C.Program statics heapBase fundefs expr) = do
   (fundefs', main) <-
     runReader @Env M.empty
       $ runReader @Statics statics
       $ (,) <$> traverse vFunc fundefs <*> vBlock SVoid expr
-  pure $ Program fundefs' main
+  pure $ Program heapBase fundefs' main

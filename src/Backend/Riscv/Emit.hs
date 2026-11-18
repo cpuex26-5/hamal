@@ -159,9 +159,11 @@ emitFun ebreak FunDef {binder, rhs, ret} = do
   runReader frame $ emitBlock (Tail ebreak ret) rhs
 
 emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
-emit (Program fundefs block) = execWriter do
+emit (Program heapBase fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
   tell @BB.Builder ".global\tmin_caml_start\n"
+  emitI "li" [build Sp, BB.intDec 0x0800_0000]
+  emitI "li" [build regHp, BB.intDec heapBase]
   emitFun True main
   mapM_ (emitFun False) fundefs
   -- runtime(min_caml_fill)
