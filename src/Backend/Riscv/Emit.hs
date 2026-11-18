@@ -177,6 +177,19 @@ emitNonTail rdM = \case
   Alloc size -> do
     for_ (xreg rdM) \rd -> emitI "mv" [build rd, build regHp]
     emitI "addi" [build regHp, build regHp, BB.intDec size]
+  Fill base size initial -> do
+    emitI "slli" [build size, build size, BB.intDec 2]
+    emitI "add" [build size, build size, build base]
+    loop <- Local <$> fresh "fill.start"
+    loopEnd <- Local <$> fresh "fill.end"
+    emitI "beq" [build base, build size, build loopEnd]
+    emitL loop
+    case initial of
+      OpX x -> emitI "sw" [build x, memFormat 0 base]
+      OpF f -> emitI "fsw" [build f, memFormat 0 base]
+    emitI "addi" [build base, build base, BB.intDec 4]
+    emitI "blt" [build base, build size, build loop]
+    emitL loopEnd
   MakeArray size initial -> for_ (xreg rdM) \rd -> do
     emitI "mv" [build rd, build regHp]
     emitI "mv" [build T3, build regHp]
@@ -190,7 +203,7 @@ emitNonTail rdM = \case
       OpX x -> emitI "sw" [build x, memFormat 0 T3]
       OpF f -> emitI "fsw" [build f, memFormat 0 T3]
     emitI "addi" [build T3, build T3, BB.intDec 4]
-    emitI "ble" [build T3, build regHp, build loop]
+    emitI "blt" [build T3, build regHp, build loop]
     emitL loopEnd
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg

@@ -59,6 +59,7 @@ data Inst (c :: RegClass) x f where
   CallInd :: x -> [x] -> [f] -> Inst c x f
   Save :: Id -> Operand c x f -> Inst Void x f
   Alloc :: Int -> Inst GPR x f -- dst <- hp; hp <- hp + n
+  Fill :: x -> x -> Operand c x f -> Inst Void x f
   MakeArray :: x -> Operand c x f -> Inst GPR x f
   In :: Inst GPR x f
   Out :: x -> Inst Void x f
@@ -109,6 +110,7 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Save ident rs -> P.insn "save" [pretty ident, pretty rs]
     Alloc size -> P.insn "alloc" [pretty size]
     MakeArray size initial -> P.insn "makearray" [pretty size, pretty initial]
+    Fill base size initial -> P.insn "fill" [pretty base, pretty size, pretty initial]
     In -> P.insn "in" []
     Out rs -> P.insn "out" [pretty rs]
     Li imm -> P.insn "li" [pretty imm]
