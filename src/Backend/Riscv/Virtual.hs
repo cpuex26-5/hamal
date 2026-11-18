@@ -1,12 +1,13 @@
 module Backend.Riscv.Virtual (virtualify) where
 
 import Backend.Riscv.Asm (Block (..), FunDef (..), Inst (..), Operand (..), Program (..), SingClass (..), SomeClass (..))
-import Basic (Binder (..), Cmp (..))
+import Basic (Binder (..), Cmp (..), Rel (..))
 import Basic qualified as B
 import Data.Functor ((<&>))
 import Data.Map.Strict qualified as M
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, ask, asks, local, runReader)
+import GHC.Float (castFloatToWord32)
 import Middleend.Closure (Captured (..), freeVars)
 import Middleend.Closure qualified as C
 import Name (Fresh, Id, Label (..), fresh)
@@ -59,9 +60,25 @@ vBlock c expr = do
   case expr of
     C.Unit | SVoid <- c -> pure $ Ans Nop
     C.Int int | SGPR <- c -> pure $ Ans (Li int)
-    C.Float float | SFPR <- c -> pure $ Ans (Fli float)
+    C.Float float | SFPR <- c -> do
+      bits <- fresh "bits"
+      pure
+        $ Let (Just (OpX bits)) (Li (fromIntegral (castFloatToWord32 float)))
+        $ Ans (FloatOfBits bits)
     C.Var ident | SGPR <- c -> pure . Ans . Mv . OpX $ ident
     C.Var ident | SFPR <- c -> pure . Ans . Mv . OpF $ ident
+    C.PrimOp (B.Floor f) | SFPR <- c -> do
+      rounded <- fresh "rounded"
+      roundedF <- fresh "roundedF"
+      set <- fresh "set"
+      zero <- fresh "zero"
+      dec <- fresh "dec"
+      pure
+        $ Let (Just (OpX rounded)) (IntOfFloat f)
+        $ Let (Just (OpF roundedF)) (FloatOfInt rounded)
+        $ Let (Just (OpX set)) (Fle roundedF f)
+        $ Let (Just (OpX zero)) (Li 0)
+        $ Ans (If Neq set zero (Ans (Mv (OpF roundedF))) (Let (Just (OpX dec)) (Addi rounded (-1)) (Ans (FloatOfInt dec))))
     C.PrimOp (B.Tuple binders) | SGPR <- c -> do
       tuple <- fresh "tuple"
       classes <- traverse (asks @Env . M.findWithDefault (error "unreachable")) binders
@@ -99,6 +116,12 @@ vBlock c expr = do
             $ Let (Just (OpX addr)) (maybe (Add addr arr) (Addi addr) offsetM)
             $ Ans (Store op addr 0)
         Nothing -> Ans Nop
+    C.PrimOp (B.In {}) | SGPR <- c -> do
+      base <- fresh "base"
+      pure $ Let (Just (OpX base)) (Li mmioBase) (Ans (In base))
+    C.PrimOp (B.Out ident) | SVoid <- c -> do
+      base <- fresh "base"
+      pure $ Let (Just (OpX base)) (Li mmioBase) (Ans (Out base ident))
     C.PrimOp op -> Ans <$> vPrimOp c op
     C.Let binder (C.PrimOp (B.Tuple idents)) body | Just base <- M.lookup binder.name statics -> do
       classes <- traverse classOfVar idents
@@ -139,7 +162,22 @@ vBlock c expr = do
           SomeClass SFPR -> Let Nothing (Store (OpF name) base offset) k
           SomeClass SVoid -> k
     C.If (ICmp rel) lhs rhs thn els -> Ans <$> (If rel lhs rhs <$> vBlock c thn <*> vBlock c els)
-    C.If (FCmp rel) lhs rhs thn els -> Ans <$> (FIf rel lhs rhs <$> vBlock c thn <*> vBlock c els)
+    C.If (FCmp rel) lhs rhs thn els -> do
+      set <- fresh "set"
+      zero <- fresh "zero"
+      let (cmp, branch) = case rel of
+            Eq -> (Feq lhs rhs, Neq)
+            Neq -> (Feq lhs rhs, Eq)
+            Lt -> (Flt lhs rhs, Neq)
+            Le -> (Fle lhs rhs, Neq)
+            Gt -> (Flt rhs lhs, Neq)
+            Ge -> (Fle rhs lhs, Neq)
+      thn' <- vBlock c thn
+      els' <- vBlock c els
+      pure
+        $ Let (Just (OpX set)) cmp
+        $ Let (Just (OpX zero)) (Li 0)
+        $ Ans (If branch set zero thn' els')
     C.AppDir label args -> do
       cargs <- traverse (\n -> (n,) <$> classOfVar n) args
       let (xargs, fargs) = partitionByClass cargs
@@ -152,6 +190,8 @@ vBlock c expr = do
         $ Let (Just (OpX code)) (Lw 0 closure)
         $ Ans (CallInd code (xargs <> [closure]) fargs)
     e -> error $ "vInst(unreachable): " <> show (c, e)
+  where
+    mmioBase = 0xffff0000
 
 vPrimOp :: (Reader Env :> es) => SingClass c -> B.PrimOp Id -> Eff es (Inst c Id Id)
 vPrimOp c op = case (c, op) of
@@ -169,7 +209,6 @@ vPrimOp c op = case (c, op) of
   (SFPR, B.FDiv lhs rhs) -> pure $ FDiv lhs rhs
   (SFPR, B.FSqrt ident) -> pure $ FSqrt ident
   (SFPR, B.FAbs ident) -> pure $ FAbs ident
-  (SFPR, B.Floor ident) -> pure $ Floor ident
   (SFPR, B.FloatOfInt int) -> pure $ FloatOfInt int
   (SGPR, B.IntOfFloat float) -> pure $ IntOfFloat float
   (_, B.Coerce ident) ->
@@ -180,8 +219,6 @@ vPrimOp c op = case (c, op) of
       (SFPR, SGPR) -> BitsOfFloat ident
       (_, SVoid) -> Nop
       (SVoid, _) -> error "coerce: unit has no bits"
-  (SGPR, B.In _) -> pure In
-  (SVoid, B.Out ident) -> pure $ Out ident
   _ -> error $ "virtualOp(unreachable): " <> show (c, op)
 
 vFunc :: (Fresh :> es, Reader Statics :> es) => C.FunDef -> Eff es (FunDef Id Id)

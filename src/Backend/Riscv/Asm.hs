@@ -59,8 +59,8 @@ data Inst (c :: RegClass) x f where
   Save :: Id -> Operand c x f -> Inst Void x f
   Alloc :: Int -> Inst GPR x f -- dst <- hp; hp <- hp + n
   AllocDyn :: x -> Inst GPR x f -- dst <- hp; hp <- hp + n
-  In :: Inst GPR x f
-  Out :: x -> Inst Void x f
+  In :: x -> Inst GPR x f -- scratch loc を引数にとっておく. ISA に in が入れば消せる
+  Out :: x -> x -> Inst Void x f
   -- GPR
   Li :: Int -> Inst GPR x f
   La :: Label -> Inst GPR x f
@@ -76,16 +76,17 @@ data Inst (c :: RegClass) x f where
   Lw :: Int -> x -> Inst GPR x f
   Restore :: Id -> Inst GPR x f
   -- FPR
-  Fli :: Float -> Inst FPR x f
   FAdd :: f -> f -> Inst FPR x f
   FNeg :: f -> Inst FPR x f
   FSub :: f -> f -> Inst FPR x f
   FMul :: f -> f -> Inst FPR x f
   FDiv :: f -> f -> Inst FPR x f
+  Feq :: f -> f -> Inst GPR x f
+  Flt :: f -> f -> Inst GPR x f
+  Fle :: f -> f -> Inst GPR x f
   FSqrt :: f -> Inst FPR x f
   FAbs :: f -> Inst FPR x f
-  Floor :: f -> Inst FPR x f
-  FIf :: Rel -> f -> f -> Block c x f -> Block c x f -> Inst c x f
+  -- Floor :: f -> Inst FPR x f
   FLw :: Int -> x -> Inst FPR x f
   FRestore :: Id -> Inst FPR x f
   FloatOfInt :: x -> Inst FPR x f
@@ -105,8 +106,8 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Save ident rs -> P.insn "save" [pretty ident, pretty rs]
     Alloc size -> P.insn "alloc" [pretty size]
     AllocDyn size -> P.insn "allocdyn" [pretty size]
-    In -> P.insn "in" []
-    Out rs -> P.insn "out" [pretty rs]
+    In base -> P.insn "in" [pretty base]
+    Out base rs -> P.insn "out" [pretty base, pretty rs]
     Li imm -> P.insn "li" [pretty imm]
     La label -> P.insn "la" [pretty label]
     Neg rs -> P.insn "neg" [pretty rs]
@@ -120,16 +121,17 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     If rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (ICmp rel) <+> pretty rs2) (pretty thn) (pretty els)
     Lw offset base -> P.insn "lw" [P.mem offset base]
     Restore ident -> P.insn "restore" [pretty ident]
-    Fli imm -> P.insn "fli" [pretty imm]
     FAdd rs1 rs2 -> P.insn "fadd" [pretty rs1, pretty rs2]
     FNeg rs -> P.insn "fneg" [pretty rs]
     FSub rs1 rs2 -> P.insn "fsub" [pretty rs1, pretty rs2]
     FMul rs1 rs2 -> P.insn "fmul" [pretty rs1, pretty rs2]
     FDiv rs1 rs2 -> P.insn "fdiv" [pretty rs1, pretty rs2]
+    Feq rs1 rs2 -> P.insn "feq" [pretty rs1, pretty rs2]
+    Flt rs1 rs2 -> P.insn "flt" [pretty rs1, pretty rs2]
+    Fle rs1 rs2 -> P.insn "fle" [pretty rs1, pretty rs2]
     FSqrt rs -> P.insn "fsqrt" [pretty rs]
     FAbs rs -> P.insn "fabs" [pretty rs]
-    Floor rs -> P.insn "floor" [pretty rs]
-    FIf rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (FCmp rel) <+> pretty rs2) (pretty thn) (pretty els)
+    -- Floor rs -> P.insn "floor" [pretty rs]
     FLw offset base -> P.insn "flw" [P.mem offset base]
     FRestore ident -> P.insn "frestore" [pretty ident]
     FloatOfInt rs -> P.insn "float_of_int" [pretty rs]

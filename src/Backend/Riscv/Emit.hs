@@ -3,9 +3,7 @@ module Backend.Riscv.Emit (emit) where
 import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), RegClass (..), SingClass (..), XReg (..))
 import Basic (Rel (..))
 import Buildable (Buildable (build))
-import Data.Bits (shiftL, shiftR, (.&.))
 import Data.Bool (bool)
-import Data.ByteString.Builder (string7)
 import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
 import Data.List (intersperse)
@@ -15,9 +13,7 @@ import Data.Set qualified as S
 import Effectful (Eff, (:>))
 import Effectful.Reader.Static (Reader, asks, runReader)
 import Effectful.Writer.Static.Local (Writer, execWriter, tell)
-import GHC.Float (castFloatToWord32)
 import Name (Fresh, Id, Label (..), fresh)
-import Text.Printf (printf)
 
 data Frame = Frame {slots :: M.Map Id Int, size :: Int}
   deriving stock (Show)
@@ -40,7 +36,6 @@ mkFrame block = Frame {slots, size = align $ (M.size slots + 1) * 4} -- 1 for ra
     saveI :: Inst c x f -> S.Set Id
     saveI = \case
       If _ _ _ thn els -> saveB thn <> saveB els
-      FIf _ _ _ thn els -> saveB thn <> saveB els
       Save ident _ -> S.singleton ident
       _ -> S.empty
 
@@ -98,24 +93,6 @@ emitNonTail rdM = \case
     emitBlock (NonTail rdM) els
     emitI "j" [build label_cont]
     emitL label_cont
-  FIf rel lhs rhs thn els -> do
-    label_else <- Local <$> fresh "else"
-    label_cont <- Local <$> fresh "cont"
-    let s = case rel of
-          Eq -> "feq.s"
-          Neq -> "fneq.s"
-          Lt -> "flt.s"
-          Le -> "fle.s"
-          Gt -> "fgt.s"
-          Ge -> "fge.s"
-    emitI s [build T1, build lhs, build rhs]
-    emitI "beqz" [build T1, build label_else]
-    emitBlock (NonTail rdM) thn
-    emitI "j" [build label_cont]
-    emitL label_else
-    emitBlock (NonTail rdM) els
-    emitI "j" [build label_cont]
-    emitL label_cont
   CallDir fun _ _ -> do
     emitI "call" [build fun]
     for_ rdM \case
@@ -126,29 +103,16 @@ emitNonTail rdM = \case
     for_ rdM \case
       OpX x -> emitI "mv" [build x, build A0]
       OpF f -> emitI "fmv.s" [build f, build Fa0]
-  Fli imm -> for_ (freg rdM) \rd -> do
-    let bits = castFloatToWord32 imm
-    let high = bits `shiftR` 12
-    let low = fromIntegral (bits .&. 0xfff) - fromIntegral (bits .&. (1 `shiftL` 11))
-    emitI "lui" [build T0, string7 $ printf "0x%05x" high]
-    emitI "addi" [build T0, build T0, BB.intDec low]
-    emitI "fmv.w.x" [build rd, build T0]
   FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
   FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
   FMul lhs rhs -> for_ (freg rdM) \rd -> emitI "fmul.s" [build rd, build lhs, build rhs]
   FDiv lhs rhs -> for_ (freg rdM) \rd -> emitI "fdiv.s" [build rd, build lhs, build rhs]
+  Feq lhs rhs -> for_ (xreg rdM) \rd -> emitI "feq.s" [build rd, build lhs, build rhs]
+  Flt lhs rhs -> for_ (xreg rdM) \rd -> emitI "flt.s" [build rd, build lhs, build rhs]
+  Fle lhs rhs -> for_ (xreg rdM) \rd -> emitI "fle.s" [build rd, build lhs, build rhs]
   FSqrt rs -> for_ (freg rdM) \rd -> emitI "fsqrt.s" [build rd, build rs]
   FAbs rs -> for_ (freg rdM) \rd -> emitI "fabs.s" [build rd, build rs]
-  Floor rs -> for_ (freg rdM) \rd -> do
-    label <- Local <$> fresh "floorL"
-    emitI "fcvt.w.s" [build T3, build rs]
-    emitI "fcvt.s.w" [build rd, build T3]
-    emitI "fle.s" [build T4, build rd, build rs]
-    emitI "bnez" [build T4, build label]
-    emitI "addi" [build T3, build T3, BB.intDec (-1)]
-    emitI "fcvt.s.w" [build rd, build T3]
-    emitL label
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
   FRestore ident -> for_ (freg rdM) \rd -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
@@ -157,13 +121,8 @@ emitNonTail rdM = \case
   IntOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fcvt.w.s" [build rd, build rs]
   FloatOfBits rs -> for_ (freg rdM) \rd -> emitI "fmv.w.x" [build rd, build rs]
   BitsOfFloat rs -> for_ (xreg rdM) \rd -> emitI "fmv.x.w" [build rd, build rs]
-  In -> do
-    let rd = fromMaybe Zero (xreg rdM)
-    emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
-    emitI "lw" [build rd, memFormat 4 T1]
-  Out rs -> do
-    emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
-    emitI "sw" [build rs, memFormat 0 T1]
+  In base -> emitI "lw" [build (fromMaybe Zero (xreg rdM)), memFormat 4 base]
+  Out base rs -> emitI "sw" [build rs, memFormat 0 base]
   Alloc size -> do
     emitI "addi" [build regHp, build regHp, BB.intDec size]
     for_ (xreg rdM) \rd -> emitI "addi" [build rd, build regHp, BB.intDec (-size)]
@@ -175,7 +134,6 @@ emitNonTail rdM = \case
     xreg = fmap \(OpX r) -> r
     freg :: Maybe (Operand FPR XReg FReg) -> Maybe FReg
     freg = fmap \(OpF r) -> r
-    mmioBase = 0xffff0
 
 emitBlock :: (Fresh :> es, Writer BB.Builder :> es, Reader Frame :> es) => Dest c -> Block c XReg FReg -> Eff es ()
 emitBlock dest = \case
@@ -206,7 +164,7 @@ emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun True main
   mapM_ (emitFun False) fundefs
-  -- runtime
+  -- runtime(min_caml_fill)
   emitL $ Global "min_caml_fill" -- a0 = addr, a1 = n, a2 = bits
   emitI "slli" [build A1, build A1, BB.intDec 2]
   emitI "add" [build A1, build A1, build A0]

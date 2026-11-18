@@ -55,7 +55,6 @@ allocInst = \case
   Store (OpX x) addr offset -> Store . OpX <$> rx T0 x <*> rx T1 addr <*> pure offset
   Store (OpF f) addr offset -> Store . OpF <$> rf Ft0 f <*> rx T1 addr <*> pure offset
   If rel lhs rhs thn els -> If rel <$> rx T0 lhs <*> rx T1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
-  FIf rel lhs rhs thn els -> FIf rel <$> rf Ft0 lhs <*> rf Ft1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
   CallDir fun xargs fargs ->
     CallDir fun
       <$> traverse (uncurry rx) (assignRegs xargRegs xargs)
@@ -68,23 +67,25 @@ allocInst = \case
   Save dst (OpX x) -> Save dst . OpX <$> rx T0 x
   Save dst (OpF f) -> Save dst . OpF <$> rf Ft0 f
   Restore ident -> pure $ Restore ident
-  Fli imm -> pure (Fli imm)
   FNeg f -> FNeg <$> rf Ft0 f
   FAdd lhs rhs -> FAdd <$> rf Ft0 lhs <*> rf Ft1 rhs
   FSub lhs rhs -> FSub <$> rf Ft0 lhs <*> rf Ft1 rhs
   FMul lhs rhs -> FMul <$> rf Ft0 lhs <*> rf Ft1 rhs
+  Feq lhs rhs -> Feq <$> rf Ft0 lhs <*> rf Ft1 rhs
+  Flt lhs rhs -> Flt <$> rf Ft0 lhs <*> rf Ft1 rhs
+  Fle lhs rhs -> Fle <$> rf Ft0 lhs <*> rf Ft1 rhs
   FDiv lhs rhs -> FDiv <$> rf Ft0 lhs <*> rf Ft1 rhs
   FSqrt f -> FSqrt <$> rf Ft0 f
   FAbs f -> FAbs <$> rf Ft0 f
-  Floor f -> Floor <$> rf Ft0 f
+  -- Floor f -> Floor <$> rf Ft0 f
   FLw offset addr -> FLw offset <$> rx T0 addr
   FRestore ident -> pure $ FRestore ident
   FloatOfInt x -> FloatOfInt <$> rx T0 x
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f
   FloatOfBits x -> FloatOfBits <$> rx T0 x
   BitsOfFloat f -> BitsOfFloat <$> rf Ft0 f
-  In -> pure In
-  Out x -> Out <$> rx T0 x
+  In base -> In <$> rx T0 base
+  Out base x -> Out <$> rx T0 base <*> rx T1 x
   Alloc size -> pure (Alloc size)
   AllocDyn size -> AllocDyn <$> rx T0 size
   where
