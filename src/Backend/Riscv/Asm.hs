@@ -54,7 +54,6 @@ data Inst (c :: RegClass) x f where
   Nop :: Inst Void x f
   Mv :: Operand c x f -> Inst c x f
   Store :: Operand c x f -> x -> Int -> Inst Void x f
-  StoreL :: Operand c x f -> Label -> Int -> Inst Void x f
   CallDir :: Label -> [x] -> [f] -> Inst c x f
   CallInd :: x -> [x] -> [f] -> Inst c x f
   Save :: Id -> Operand c x f -> Inst Void x f
@@ -75,7 +74,6 @@ data Inst (c :: RegClass) x f where
   Srai :: x -> Int -> Inst GPR x f
   If :: Rel -> x -> x -> Block c x f -> Block c x f -> Inst c x f
   Lw :: Int -> x -> Inst GPR x f
-  LwL :: Int -> Label -> Inst GPR x f
   Restore :: Id -> Inst GPR x f
   -- FPR
   Fli :: Float -> Inst FPR x f
@@ -89,7 +87,6 @@ data Inst (c :: RegClass) x f where
   Floor :: f -> Inst FPR x f
   FIf :: Rel -> f -> f -> Block c x f -> Block c x f -> Inst c x f
   FLw :: Int -> x -> Inst FPR x f
-  FLwL :: Int -> Label -> Inst FPR x f
   FRestore :: Id -> Inst FPR x f
   FloatOfInt :: x -> Inst FPR x f
   IntOfFloat :: f -> Inst GPR x f
@@ -103,7 +100,6 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Nop -> "nop"
     Mv rs -> P.insn "mv" [pretty rs]
     Store rs base offset -> P.insn "store" [pretty rs, P.mem offset base]
-    StoreL rs label offset -> P.insn "storel" [pretty rs, P.mem offset label]
     CallDir label xargs fargs -> P.call "calldir" (pretty label) xargs fargs
     CallInd code xargs fargs -> P.call "callind" (pretty code) xargs fargs
     Save ident rs -> P.insn "save" [pretty ident, pretty rs]
@@ -123,7 +119,6 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Srai rs imm -> P.insn "srai" [pretty rs, pretty imm]
     If rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (ICmp rel) <+> pretty rs2) (pretty thn) (pretty els)
     Lw offset base -> P.insn "lw" [P.mem offset base]
-    LwL offset label -> P.insn "lwl" [P.mem offset label]
     Restore ident -> P.insn "restore" [pretty ident]
     Fli imm -> P.insn "fli" [pretty imm]
     FAdd rs1 rs2 -> P.insn "fadd" [pretty rs1, pretty rs2]
@@ -136,7 +131,6 @@ instance (Pretty x, Pretty f) => Pretty (Inst c x f) where
     Floor rs -> P.insn "floor" [pretty rs]
     FIf rel rs1 rs2 thn els -> P.ifThenElse (pretty rs1 <+> pretty (FCmp rel) <+> pretty rs2) (pretty thn) (pretty els)
     FLw offset base -> P.insn "flw" [P.mem offset base]
-    FLwL offset label -> P.insn "flwl" [P.mem offset label]
     FRestore ident -> P.insn "frestore" [pretty ident]
     FloatOfInt rs -> P.insn "float_of_int" [pretty rs]
     IntOfFloat rs -> P.insn "int_of_float" [pretty rs]

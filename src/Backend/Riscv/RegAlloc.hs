@@ -52,11 +52,8 @@ allocInst = \case
   Slli x shamt -> Slli <$> rx T0 x <*> pure shamt
   Srai x shamt -> Srai <$> rx T0 x <*> pure shamt
   Lw offset addr -> Lw offset <$> rx T0 addr
-  LwL offset label -> pure (LwL offset label)
   Store (OpX x) addr offset -> Store . OpX <$> rx T0 x <*> rx T1 addr <*> pure offset
   Store (OpF f) addr offset -> Store . OpF <$> rf Ft0 f <*> rx T1 addr <*> pure offset
-  StoreL (OpX x) label offset -> StoreL . OpX <$> rx T0 x <*> pure label <*> pure offset
-  StoreL (OpF f) label offset -> StoreL . OpF <$> rf Ft0 f <*> pure label <*> pure offset
   If rel lhs rhs thn els -> If rel <$> rx T0 lhs <*> rx T1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
   FIf rel lhs rhs thn els -> FIf rel <$> rf Ft0 lhs <*> rf Ft1 rhs <*> pure (allocBlock thn) <*> pure (allocBlock els)
   CallDir fun xargs fargs ->
@@ -81,7 +78,6 @@ allocInst = \case
   FAbs f -> FAbs <$> rf Ft0 f
   Floor f -> Floor <$> rf Ft0 f
   FLw offset addr -> FLw offset <$> rx T0 addr
-  FLwL offset label -> pure (FLwL offset label)
   FRestore ident -> pure $ FRestore ident
   FloatOfInt x -> FloatOfInt <$> rx T0 x
   IntOfFloat f -> IntOfFloat <$> rf Ft0 f

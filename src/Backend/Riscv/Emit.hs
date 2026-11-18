@@ -70,17 +70,9 @@ emitNonTail rdM = \case
   Slli rs imm -> for_ (xreg rdM) \rd -> emitI "slli" [build rd, build rs, BB.intDec imm]
   Srai rs imm -> for_ (xreg rdM) \rd -> emitI "srai" [build rd, build rs, BB.intDec imm]
   Lw offset rs -> for_ (xreg rdM) \rd -> emitI "lw" [build rd, memFormat offset rs]
-  LwL offset label -> for_ (xreg rdM) \rd -> do
-    emitI "la" [build T1, build label]
-    emitI "lw" [build rd, memFormat offset T1]
   Store rs addr offset -> case rs of
     OpX x -> emitI "sw" [build x, memFormat offset addr]
     OpF f -> emitI "fsw" [build f, memFormat offset addr]
-  StoreL rs label offset -> do
-    emitI "la" [build T1, build label]
-    case rs of
-      OpX x -> emitI "sw" [build x, memFormat offset T1]
-      OpF f -> emitI "fsw" [build f, memFormat offset T1]
   Save ident rs -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
     case rs of
@@ -158,9 +150,6 @@ emitNonTail rdM = \case
     emitI "fcvt.s.w" [build rd, build T3]
     emitL label
   FLw offset addr -> for_ (freg rdM) \rd -> emitI "flw" [build rd, memFormat offset addr]
-  FLwL offset label -> for_ (freg rdM) \rd -> do
-    emitI "la" [build T1, build label]
-    emitI "flw" [build rd, memFormat offset T1]
   FRestore ident -> for_ (freg rdM) \rd -> do
     offset <- asks @Frame (M.findWithDefault (error "emitNonTail(unreachable)") ident . (.slots))
     emitI "flw" [build rd, memFormat offset Sp]
