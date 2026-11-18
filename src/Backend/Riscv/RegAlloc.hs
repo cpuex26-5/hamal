@@ -90,10 +90,7 @@ allocInst = \case
   In -> pure In
   Out x -> Out <$> rx T0 x
   Alloc size -> pure (Alloc size)
-  MakeArray size (OpX x) -> MakeArray <$> rx T0 size <*> (OpX <$> rx T1 x)
-  MakeArray size (OpF f) -> MakeArray <$> rx T0 size <*> (OpF <$> rf Ft0 f)
-  Fill base size (OpX x) -> Fill <$> rx T0 base <*> rx T1 size <*> (OpX <$> rx T2 x)
-  Fill base size (OpF f) -> Fill <$> rx T0 base <*> rx T1 size <*> (OpF <$> rf Ft0 f)
+  AllocDyn size -> AllocDyn <$> rx T0 size
   where
     rx x ident = ([Restoring (OpX x) ident], x)
     rf f ident = ([Restoring (OpF f) ident], f)

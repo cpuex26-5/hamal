@@ -42,6 +42,17 @@ insertLet dst (Let d i rest) k = Let d i (insertLet dst rest k)
 classOfVar :: (Reader Env :> es) => Id -> Eff es SomeClass
 classOfVar = asks . M.findWithDefault (error "unreachable")
 
+fill :: (Fresh :> es, Reader Env :> es) => Id -> Id -> Id -> Eff es (Block c Id Id -> Block c Id Id)
+fill arr size initial =
+  classOfVar initial >>= \case
+    SomeClass SVoid -> pure id
+    SomeClass SGPR -> pure $ call initial
+    SomeClass SFPR -> do
+      bits <- fresh "bits"
+      pure $ Let (Just (OpX bits)) (BitsOfFloat initial) . call bits
+  where
+    call val = Let Nothing (CallDir (Global "min_caml_fill") [arr, size, val] [])
+
 vBlock :: (Fresh :> es, Reader Env :> es, Reader Statics :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
 vBlock c expr = do
   statics <- ask @Statics
@@ -58,6 +69,14 @@ vBlock c expr = do
       pure
         $ Let (Just (OpX tuple)) (Alloc (4 * length binders))
         $ foldr store (Ans (Mv (OpX tuple))) (zip3 binders classes [0, 4 ..])
+    C.PrimOp (B.Array size initial) | SGPR <- c -> do
+      arr <- fresh "array"
+      bytes <- fresh "bytes"
+      withFill <- fill arr size initial
+      pure
+        $ Let (Just (OpX bytes)) (Slli size 2)
+        $ Let (Just (OpX arr)) (AllocDyn bytes)
+        $ withFill (Ans (Mv (OpX arr)))
     C.PrimOp (B.Get {}) | SVoid <- c -> pure $ Ans Nop
     C.PrimOp (B.Get arr idx) -> do
       offsetM <- asks @Statics (M.lookup arr)
@@ -89,11 +108,9 @@ vBlock c expr = do
         $ Let (Just (OpX binder.name)) (Li base)
         $ foldr store body' (zip3 idents classes [0, 4 ..])
     C.Let binder (C.PrimOp (B.Array size initial)) body | Just base <- M.lookup binder.name statics -> do
-      SomeClass ci <- classOfVar initial
       body' <- local @Env (M.insert binder.name (SomeClass SGPR)) (vBlock c body)
-      pure
-        $ Let (Just (OpX binder.name)) (Li base)
-        $ maybe id (\op -> Let Nothing (Fill binder.name size op)) (operand ci initial) body'
+      withFill <- fill binder.name size initial
+      pure $ Let (Just (OpX binder.name)) (Li base) (withFill body')
     C.Let binder rhs body | SomeClass c' <- classOf binder.ty -> do
       rhs' <- vBlock c' rhs
       body' <- local (M.insert binder.name (SomeClass c')) (vBlock c body)
@@ -165,11 +182,6 @@ vPrimOp c op = case (c, op) of
       (SVoid, _) -> error "coerce: unit has no bits"
   (SGPR, B.In _) -> pure In
   (SVoid, B.Out ident) -> pure $ Out ident
-  (SGPR, B.Array size initial) ->
-    classOfVar initial <&> \case
-      SomeClass SGPR -> MakeArray size (OpX initial)
-      SomeClass SFPR -> MakeArray size (OpF initial)
-      SomeClass SVoid -> Alloc 0
   _ -> error $ "virtualOp(unreachable): " <> show (c, op)
 
 vFunc :: (Fresh :> es, Reader Statics :> es) => C.FunDef -> Eff es (FunDef Id Id)

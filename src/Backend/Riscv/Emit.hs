@@ -176,36 +176,11 @@ emitNonTail rdM = \case
     emitI "lui" [build T1, "0x" <> BB.int32HexFixed mmioBase]
     emitI "sw" [build rs, memFormat 0 T1]
   Alloc size -> do
-    for_ (xreg rdM) \rd -> emitI "mv" [build rd, build regHp]
     emitI "addi" [build regHp, build regHp, BB.intDec size]
-  Fill base size initial -> do
-    emitI "slli" [build size, build size, BB.intDec 2]
-    emitI "add" [build size, build size, build base]
-    loop <- Local <$> fresh "fill.start"
-    loopEnd <- Local <$> fresh "fill.end"
-    emitI "beq" [build base, build size, build loopEnd]
-    emitL loop
-    case initial of
-      OpX x -> emitI "sw" [build x, memFormat 0 base]
-      OpF f -> emitI "fsw" [build f, memFormat 0 base]
-    emitI "addi" [build base, build base, BB.intDec 4]
-    emitI "blt" [build base, build size, build loop]
-    emitL loopEnd
-  MakeArray size initial -> for_ (xreg rdM) \rd -> do
-    emitI "mv" [build rd, build regHp]
-    emitI "mv" [build T3, build regHp]
-    emitI "slli" [build size, build size, BB.intDec 2]
-    emitI "add" [build regHp, build regHp, build size]
-    loop <- Local <$> fresh "makearray.start"
-    loopEnd <- Local <$> fresh "makearray.end"
-    emitI "beqz" [build size, build loopEnd]
-    emitL loop
-    case initial of
-      OpX x -> emitI "sw" [build x, memFormat 0 T3]
-      OpF f -> emitI "fsw" [build f, memFormat 0 T3]
-    emitI "addi" [build T3, build T3, BB.intDec 4]
-    emitI "blt" [build T3, build regHp, build loop]
-    emitL loopEnd
+    for_ (xreg rdM) \rd -> emitI "addi" [build rd, build regHp, BB.intDec (-size)]
+  AllocDyn rs -> do
+    emitI "add" [build regHp, build regHp, build rs]
+    for_ (xreg rdM) \rd -> emitI "sub" [build rd, build regHp, build rs]
   where
     xreg :: Maybe (Operand GPR XReg FReg) -> Maybe XReg
     xreg = fmap \(OpX r) -> r
@@ -242,6 +217,17 @@ emit (Program fundefs block) = execWriter do
   tell @BB.Builder ".global\tmin_caml_start\n"
   emitFun True main
   mapM_ (emitFun False) fundefs
+  -- runtime
+  emitL $ Global "min_caml_fill" -- a0 = addr, a1 = n, a2 = bits
+  emitI "slli" [build A1, build A1, BB.intDec 2]
+  emitI "add" [build A1, build A1, build A0]
+  emitI "bge" [build A0, build A1, "min_caml_fill.end"]
+  emitL $ Global "min_caml_fill.loop"
+  emitI "sw" [build A2, memFormat 0 A0]
+  emitI "addi" [build A0, build A0, BB.intDec 4]
+  emitI "blt" [build A0, build A1, "min_caml_fill.loop"]
+  emitL $ Global "min_caml_fill.end"
+  emitI "ret" []
   where
     main =
       FunDef
