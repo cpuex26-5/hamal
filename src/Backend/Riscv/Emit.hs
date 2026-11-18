@@ -161,26 +161,26 @@ emitFun ebreak FunDef {binder, rhs, ret} = do
 emit :: (Fresh :> es) => Program XReg FReg -> Eff es BB.Builder
 emit (Program heapBase fundefs block) = execWriter do
   tell @BB.Builder ".section\t.text\n"
-  tell @BB.Builder ".global\tmin_caml_start\n"
+  tell @BB.Builder ".global\thamal_start\n"
   emitI "li" [build Sp, BB.intDec 0x0800_0000]
   emitI "li" [build regHp, BB.intDec heapBase]
   emitFun True main
   mapM_ (emitFun False) fundefs
-  -- runtime(min_caml_fill)
-  emitL $ Global "min_caml_fill" -- a0 = addr, a1 = n, a2 = bits
+  -- runtime(hamal_fill)
+  emitL $ Global "hamal_fill" -- a0 = addr, a1 = n, a2 = bits
   emitI "slli" [build A1, build A1, BB.intDec 2]
   emitI "add" [build A1, build A1, build A0]
-  emitI "bge" [build A0, build A1, "min_caml_fill.end"]
-  emitL $ Global "min_caml_fill.loop"
+  emitI "bge" [build A0, build A1, "hamal_fill.end"]
+  emitL $ Global "hamal_fill.loop"
   emitI "sw" [build A2, memFormat 0 A0]
   emitI "addi" [build A0, build A0, BB.intDec 4]
-  emitI "blt" [build A0, build A1, "min_caml_fill.loop"]
-  emitL $ Global "min_caml_fill.end"
+  emitI "blt" [build A0, build A1, "hamal_fill.loop"]
+  emitL $ Global "hamal_fill.end"
   emitI "ret" []
   where
     main =
       FunDef
-        { binder = Global "min_caml_start"
+        { binder = Global "hamal_start"
         , xparams = []
         , fparams = []
         , rhs = block

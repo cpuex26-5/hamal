@@ -52,7 +52,7 @@ fill arr size initial =
       bits <- fresh "bits"
       pure $ Let (Just (OpX bits)) (BitsOfFloat initial) . call bits
   where
-    call val = Let Nothing (CallDir (Global "min_caml_fill") [arr, size, val] [])
+    call val = Let Nothing (CallDir (Global "hamal_fill") [arr, size, val] [])
 
 vBlock :: (Fresh :> es, Reader Env :> es, Reader Statics :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
 vBlock c expr = do
