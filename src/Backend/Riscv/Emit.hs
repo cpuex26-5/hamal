@@ -3,6 +3,7 @@ module Backend.Riscv.Emit (emit) where
 import Backend.Riscv.Asm (Block (..), FReg (..), FunDef (..), Inst (..), Operand (..), Program (..), RegClass (..), SingClass (..), XReg (..))
 import Basic (Rel (..))
 import Buildable (Buildable (build))
+import Control.Monad (unless)
 import Data.Bool (bool)
 import Data.ByteString.Builder qualified as BB
 import Data.Foldable (for_)
@@ -54,8 +55,8 @@ emitNonTail rdM = \case
   Li imm -> for_ (xreg rdM) \rd -> emitI "li" [build rd, BB.intDec imm]
   La label -> for_ (xreg rdM) \rd -> emitI "la" [build rd, build label]
   Mv rs -> case rs of
-    OpX x -> for_ (xreg rdM) \rd -> emitI "mv" [build rd, build x]
-    OpF f -> for_ (freg rdM) \rd -> emitI "fmv.s" [build rd, build f]
+    OpX x -> for_ (xreg rdM) \rd -> unless (rd == x) $ emitI "mv" [build rd, build x]
+    OpF f -> for_ (freg rdM) \rd -> unless (rd == f) $ emitI "fmv.s" [build rd, build f]
   Neg rs -> for_ (xreg rdM) \rd -> emitI "sub" [build rd, build Zero, build rs]
   Add rs1 rs2 -> for_ (xreg rdM) \rd -> emitI "add" [build rd, build rs1, build rs2]
   Addi rs1 imm -> for_ (xreg rdM) \rd -> emitI "addi" [build rd, build rs1, BB.intDec imm]
@@ -95,13 +96,13 @@ emitNonTail rdM = \case
   CallDir fun _ _ -> do
     emitI "call" [build fun]
     for_ rdM \case
-      OpX x -> emitI "mv" [build x, build A0]
-      OpF f -> emitI "fmv.s" [build f, build Fa0]
+      OpX x -> unless (x == A0) $ emitI "mv" [build x, build A0]
+      OpF f -> unless (f == Fa0) $ emitI "fmv.s" [build f, build Fa0]
   CallInd code _ _ -> do
     emitI "jalr" [build code]
     for_ rdM \case
-      OpX x -> emitI "mv" [build x, build A0]
-      OpF f -> emitI "fmv.s" [build f, build Fa0]
+      OpX x -> unless (x == A0) $ emitI "mv" [build x, build A0]
+      OpF f -> unless (f == Fa0) $ emitI "fmv.s" [build f, build Fa0]
   FNeg rs -> for_ (freg rdM) \rd -> emitI "fneg.s" [build rd, build rs]
   FAdd lhs rhs -> for_ (freg rdM) \rd -> emitI "fadd.s" [build rd, build lhs, build rhs]
   FSub lhs rhs -> for_ (freg rdM) \rd -> emitI "fsub.s" [build rd, build lhs, build rhs]
