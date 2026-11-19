@@ -54,7 +54,9 @@ fill arr size initial =
   where
     call val = Let Nothing (CallDir (Global "hamal_fill") [arr, size, val] [])
 
-vBlock :: (Fresh :> es, Reader Env :> es, Reader Statics :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
+newtype Adhoc = Adhoc (M.Map Id Int)
+
+vBlock :: (Fresh :> es, Reader Env :> es, Reader Statics :> es, Reader Adhoc :> es) => SingClass c -> C.Exp -> Eff es (Block c Id Id)
 vBlock c expr = do
   statics <- ask @Statics
   case expr of
@@ -90,33 +92,40 @@ vBlock c expr = do
       arr <- fresh "array"
       bytes <- fresh "bytes"
       withFill <- fill arr size initial
-      pure
-        $ Let (Just (OpX bytes)) (Slli size 2)
-        $ Let (Just (OpX arr)) (AllocDyn bytes)
-        $ withFill (Ans (Mv (OpX arr)))
+      asks (\(Adhoc env) -> M.lookup size env) <&> \case
+        Nothing ->
+          Let (Just (OpX bytes)) (Slli size 2)
+            $ Let (Just (OpX arr)) (AllocDyn bytes)
+            $ withFill (Ans (Mv (OpX arr)))
+        Just n ->
+          Let (Just (OpX arr)) (Alloc (n * 4)) $
+            withFill (Ans (Mv (OpX arr)))
     C.PrimOp (B.Get {}) | SVoid <- c -> pure $ Ans Nop
     C.PrimOp (B.Get arr idx) -> do
       offsetM <- asks @Statics (M.lookup arr)
       addr <- fresh "addr"
       addr' <- fresh "addr"
-      pure
-        $ Let (Just (OpX addr)) (Slli idx 2)
-        $ Let (Just (OpX addr')) (maybe (Add addr arr) (Addi addr) offsetM)
-        $ Ans
-          ( case c of
-              SGPR -> Lw 0 addr'
-              SFPR -> FLw 0 addr'
-          )
+      asks (\(Adhoc env) -> M.lookup idx env) <&> \case
+        Nothing ->
+          Let (Just (OpX addr)) (Slli idx 2)
+            $ Let (Just (OpX addr')) (maybe (Add addr arr) (Addi addr) offsetM)
+            $ Ans (case c of SGPR -> Lw 0 addr'; SFPR -> FLw 0 addr')
+        Just n ->
+          Ans (case c of SGPR -> Lw (n * 4) arr; SFPR -> FLw (n * 4) arr)
     C.PrimOp (B.Put arr idx rhs) | SVoid <- c -> do
       offsetM <- asks @Statics (M.lookup arr)
       addr <- fresh "addr"
       addr' <- fresh "addr"
       SomeClass crhs <- classOfVar rhs
+      idxM <- asks (\(Adhoc env) -> M.lookup idx env)
       pure $ case operand crhs rhs of
         Just op ->
-          Let (Just (OpX addr)) (Slli idx 2)
-            $ Let (Just (OpX addr')) (maybe (Add addr arr) (Addi addr) offsetM)
-            $ Ans (Store op addr' 0)
+          case idxM of
+            Nothing ->
+              Let (Just (OpX addr)) (Slli idx 2)
+                $ Let (Just (OpX addr')) (maybe (Add addr arr) (Addi addr) offsetM)
+                $ Ans (Store op addr' 0)
+            Just n -> Ans (Store op arr (4 * n))
         Nothing -> Ans Nop
     C.PrimOp (B.In {}) | SGPR <- c -> do
       base <- fresh "base"
@@ -125,6 +134,13 @@ vBlock c expr = do
       base <- fresh "base"
       pure $ Let (Just (OpX base)) (Li mmioBase) (Ans (Out base ident))
     C.PrimOp op -> Ans <$> vPrimOp c op
+    -- FIXME: adhoc addressing mode folding
+    C.Let binder rhs@(C.Int n) body | SomeClass SGPR <- classOf binder.ty -> do
+      rhs' <- vBlock SGPR rhs
+      body' <-
+        local (\(Adhoc env) -> Adhoc (M.insert binder.name n env)) $
+          local (M.insert binder.name (SomeClass SGPR)) (vBlock c body)
+      pure $ insertLet (operand SGPR binder.name) rhs' body'
     C.Let binder (C.PrimOp (B.Tuple idents)) body | Just base <- M.lookup binder.name statics -> do
       classes <- traverse classOfVar idents
       body' <- local @Env (M.insert binder.name (SomeClass SGPR)) (vBlock c body)
@@ -223,7 +239,7 @@ vPrimOp c op = case (c, op) of
       (SVoid, _) -> error "coerce: unit has no bits"
   _ -> error $ "virtualOp(unreachable): " <> show (c, op)
 
-vFunc :: (Fresh :> es, Reader Statics :> es) => C.FunDef -> Eff es (FunDef Id Id)
+vFunc :: (Fresh :> es, Reader Statics :> es, Reader Adhoc :> es) => C.FunDef -> Eff es (FunDef Id Id)
 vFunc C.FunDef {binder, params, captured, rhs} = case binder.ty of
   T.Type (T.Fun _ ret) | SomeClass cret <- classOf (T.Type ret) -> do
     statics <- M.toList <$> asks @Statics (`M.restrictKeys` freeVars rhs)
@@ -247,5 +263,6 @@ virtualify (C.Program statics heapBase fundefs expr) = do
   (fundefs', main) <-
     runReader @Env M.empty
       $ runReader @Statics statics
+      $ runReader @Adhoc (Adhoc M.empty)
       $ (,) <$> traverse vFunc fundefs <*> vBlock SVoid expr
   pure $ Program heapBase fundefs' main
