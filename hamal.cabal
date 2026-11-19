@@ -67,6 +67,7 @@ library
     Middleend.KNormal
     Middleend.Opt.Assoc
     Middleend.Opt.Beta
+    Middleend.Opt.ConstFold
     Middleend.Opt.Elim
     Middleend.Opt.TupleFlatten
     Name

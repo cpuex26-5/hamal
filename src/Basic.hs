@@ -1,4 +1,4 @@
-module Basic (PrimOp (..), Rel (..), Cmp (..), Binder (..), FunBind (..)) where
+module Basic (PrimOp (..), Rel (..), Cmp (..), Binder (..), FunBind (..), compareOf) where
 
 import Data.Bifunctor.TH (deriveBifoldable, deriveBifunctor, deriveBitraversable)
 import Data.Functor.Classes (Show1)
@@ -63,6 +63,15 @@ instance (Pretty a) => Pretty (PrimOp a) where
 
 data Rel = Eq | Neq | Lt | Le | Gt | Ge
   deriving stock (Show, Eq, Ord)
+
+compareOf :: (Ord a) => Rel -> a -> a -> Bool
+compareOf rel lhs rhs = case rel of
+  Eq -> lhs == rhs
+  Neq -> lhs /= rhs
+  Lt -> lhs < rhs
+  Le -> lhs <= rhs
+  Gt -> lhs > rhs
+  Ge -> lhs >= rhs
 
 instance Pretty Rel where
   pretty Eq = "="
