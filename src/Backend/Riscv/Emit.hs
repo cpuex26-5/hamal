@@ -91,7 +91,6 @@ emitNonTail rdM = \case
     emitI "j" [build label_cont]
     emitL label_else
     emitBlock (NonTail rdM) els
-    emitI "j" [build label_cont]
     emitL label_cont
   CallDir fun _ _ -> do
     emitI "call" [build fun]
