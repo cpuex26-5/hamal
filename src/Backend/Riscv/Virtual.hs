@@ -104,8 +104,8 @@ vBlock c expr = do
         $ Let (Just (OpX addr')) (maybe (Add addr arr) (Addi addr) offsetM)
         $ Ans
           ( case c of
-              SGPR -> Lw 0 addr
-              SFPR -> FLw 0 addr
+              SGPR -> Lw 0 addr'
+              SFPR -> FLw 0 addr'
           )
     C.PrimOp (B.Put arr idx rhs) | SVoid <- c -> do
       offsetM <- asks @Statics (M.lookup arr)
@@ -116,7 +116,7 @@ vBlock c expr = do
         Just op ->
           Let (Just (OpX addr)) (Slli idx 2)
             $ Let (Just (OpX addr')) (maybe (Add addr arr) (Addi addr) offsetM)
-            $ Ans (Store op addr 0)
+            $ Ans (Store op addr' 0)
         Nothing -> Ans Nop
     C.PrimOp (B.In {}) | SGPR <- c -> do
       base <- fresh "base"
