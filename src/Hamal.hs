@@ -24,6 +24,7 @@ import Middleend.Opt.Assoc (assocLet)
 import Middleend.Opt.Beta (betaConvert)
 import Middleend.Opt.ConstFold (constFold)
 import Middleend.Opt.Elim (elimDeadCode)
+import Middleend.Opt.Rematerialize (constRemat)
 import Middleend.Opt.TupleFlatten (flattenArgs, flattenLetTuple)
 import Name (Fresh, Id, runFresh)
 
@@ -34,6 +35,7 @@ data Phase
   | TupleFlatten
   | Beta
   | Assoc
+  | ConstRemat
   | ConstFold
   | Elim
   | Optimized
@@ -49,6 +51,7 @@ data Stage a where
   STupleFlatten :: Int -> Stage K.Exp
   SBeta :: Int -> Stage K.Exp
   SAssoc :: Int -> Stage K.Exp
+  SConstRemat :: Int -> Stage K.Exp
   SConstFold :: Int -> Stage K.Exp
   SElim :: Int -> Stage K.Exp
   SOptimized :: Stage K.Exp
@@ -64,6 +67,7 @@ phase = \case
   STupleFlatten {} -> TupleFlatten
   SBeta {} -> Beta
   SAssoc {} -> Assoc
+  SConstRemat {} -> ConstRemat
   SConstFold {} -> ConstFold
   SElim {} -> Elim
   SOptimized -> Optimized
@@ -79,6 +83,7 @@ phaseName = \case
   TupleFlatten -> "flatten"
   Beta -> "beta"
   Assoc -> "assoc"
+  ConstRemat -> "constremat"
   ConstFold -> "constfold"
   Elim -> "elim"
   Optimized -> "optimized"
@@ -124,6 +129,7 @@ optimize limit = go 1
       [ -- (STupleFlatten, fmap flattenLetTuple . flattenArgs)
         (SBeta, betaConvert)
       , (SAssoc, pure . assocLet)
+      , (SConstRemat, constRemat)
       , (SConstFold, constFold)
       , (SElim, elimDeadCode)
       ]

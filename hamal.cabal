@@ -69,6 +69,7 @@ library
     Middleend.Opt.Beta
     Middleend.Opt.ConstFold
     Middleend.Opt.Elim
+    Middleend.Opt.Rematerialize
     Middleend.Opt.TupleFlatten
     Name
     Pretty
